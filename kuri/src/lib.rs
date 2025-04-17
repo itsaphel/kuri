@@ -2,13 +2,13 @@ pub mod context;
 pub mod errors;
 mod handler;
 pub mod id;
-mod server;
+mod serve;
 mod service;
 pub mod transport;
 
 // aliases
 pub use handler::{PromptHandler, ToolHandler};
-pub use server::Server;
+pub use serve::serve;
 pub use service::{MCPService, MCPServiceBuilder};
 
 // re-export certain MCP protocol types

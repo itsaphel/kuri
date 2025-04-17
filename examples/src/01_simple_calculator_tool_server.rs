@@ -1,7 +1,5 @@
 use anyhow::Result;
-use kuri::transport::ByteTransport;
-use kuri::{MCPServiceBuilder, Server, ToolError, tool};
-use tokio::io::{stdin, stdout};
+use kuri::{MCPServiceBuilder, ToolError, serve, tool, transport::StdioTransport};
 use tracing_subscriber::{self, EnvFilter};
 
 #[tool(
@@ -56,13 +54,13 @@ async fn main() -> Result<()> {
     .with_tool(Calculator)
     .build();
 
-    // Create and run the server over the stdio transport
-    let server = Server::new(service);
-    let transport = ByteTransport::new(stdin(), stdout());
-
     tracing::info!(
-        "Server started over stdin/stdout. Logging to {}. Ready to accept requests",
+        "Starting server over stdin. Logging to {}",
         log_dir.path().display()
     );
-    Ok(server.run(transport).await?)
+
+    // Serve over the stdio transport
+    serve(service, StdioTransport::new()).await?;
+
+    Ok(())
 }

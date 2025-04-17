@@ -62,18 +62,19 @@ async fn summarise_text(text: String, format: Option<String>) -> String {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    // Create the MCP service
     let service = MCPServiceBuilder::new(
         "kuri's test server".to_string(),
         "This server provides a `calculator` tool that can perform basic arithmetic operations, and a prompt to summarise text.".to_string()
     )
+    // Register the tool and prompt
     .with_tool(Calculator)
     .with_prompt(SummariseText)
     .build();
 
-    // Create and run the server over the stdio transport
-    let server = Server::new(service);
-    let transport = ByteTransport::new(stdin(), stdout());
-    Ok(server.run(transport).await?)
+    // Serve over the stdio transport
+    serve(service, StdioTransport::new()).await?;
+    Ok(())
 }
 ```
 

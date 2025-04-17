@@ -1,7 +1,5 @@
 use anyhow::Result;
-use kuri::transport::ByteTransport;
-use kuri::{MCPServiceBuilder, Server, prompt};
-use tokio::io::{stdin, stdout};
+use kuri::{MCPServiceBuilder, prompt, serve, transport::StdioTransport};
 use tracing_subscriber::{self, EnvFilter};
 
 #[prompt(
@@ -54,13 +52,8 @@ async fn main() -> Result<()> {
     .with_prompt(SummariseText)
     .build();
 
-    // Create and run the server over the stdio transport
-    let server = Server::new(service);
-    let transport = ByteTransport::new(stdin(), stdout());
+    // Serve over the stdio transport
+    serve(service, StdioTransport::new()).await?;
 
-    tracing::info!(
-        "Server started over stdin/stdout. Logging to {}. Ready to accept requests",
-        log_dir.path().display()
-    );
-    Ok(server.run(transport).await?)
+    Ok(())
 }
