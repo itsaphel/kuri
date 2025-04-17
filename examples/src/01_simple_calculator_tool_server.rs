@@ -17,7 +17,7 @@ async fn calculator(x: i32, y: i32, operation: String) -> Result<i32, ToolError>
         "multiply" => Ok(x * y),
         "divide" => {
             if y == 0 {
-                Err(ToolError::ExecutionError("Division by zero".into()))
+                Err(ToolError::ExecutionError("Division by zero".to_string()))
             } else {
                 Ok(x / y)
             }
