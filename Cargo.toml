@@ -1,0 +1,17 @@
+[workspace]
+resolver = "2"
+members = [
+    "kuri",
+    "kuri_macros",
+    "kuri_mcp_protocol",
+    "examples",
+]
+
+[workspace.dependencies]
+kuri = { path = "./kuri" }
+kuri_macros = { path = "./kuri_macros" }
+kuri_mcp_protocol = { path = "./kuri_mcp_protocol" }
+
+[workspace.package]
+edition = "2021"
+license = "MIT"

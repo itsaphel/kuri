@@ -1,0 +1,37 @@
+[package]
+name = "kuri"
+version = "0.1.0"
+description = """
+An SDK for building MCP servers, focused on elegant developer experience, where tools and prompts
+are just plain old Rust functions.
+"""
+repository = "https://github.com/itsaphel/kuri"
+homepage = "https://github.com/itsaphel/kuri"
+documentation = "https://docs.rs/kuri"
+categories = ["web-programming", "network-programming", "asynchronous"]
+keywords = ["mcp", "modelcontextprotocol", "protocol", "sdk", "async"]
+readme = "../README.md"
+edition.workspace = true
+license.workspace = true
+publish = true
+
+[dependencies]
+kuri_macros = { version = "0.1.0", path = "../kuri_macros" }
+kuri_mcp_protocol = { version = "0.1.0", path = "../kuri_mcp_protocol" }
+
+async-trait = "0.1"
+futures = { version = "0.3", default-features = false, features = ["std"] }
+pin-project = "1.1"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "1.0"
+tokio = { version = "1", features = ["full"] }
+tower = "0.5"
+tracing = { version = "0.1", features = ["valuable"] }
+valuable = "0.1"
+uuid = { version = "1.16", features = ["v7"] }
+
+[dev-dependencies]
+schemars = "0.8"
+tracing-appender = "0.2"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }

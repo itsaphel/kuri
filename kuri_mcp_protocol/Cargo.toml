@@ -1,0 +1,26 @@
+[package]
+name = "kuri_mcp_protocol"
+version = "0.1.0"
+description = "Core types for the MCP protocol"
+repository = "https://github.com/itsaphel/kuri"
+homepage = "https://github.com/itsaphel/kuri"
+documentation = "https://docs.rs/kuri_mcp_protocol"
+categories = ["web-programming", "network-programming", "asynchronous"]
+keywords = ["mcp", "modelcontextprotocol", "protocol", "sdk", "async"]
+readme = "README.md"
+edition.workspace = true
+license.workspace = true
+publish = true
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "1.0"
+schemars = "0.8"
+url = "2.5"
+base64 = "0.21"
+valuable = { version = "0.1", features = ["derive"] }
+
+[dev-dependencies]
+tempfile = "3.8"
+anyhow = "1.0"

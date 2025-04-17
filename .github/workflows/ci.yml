@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        rust: [stable, beta]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{matrix.rust}}
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo check --workspace --all-features
+      - run: cargo test --workspace --all-features
+
+  style:
+    name: Clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+      - name: clippy
+        # locally, can try `cargo clippy -- -Dclippy::all -Dclippy::pedantic`
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+      - name: rustfmt
+        run: cargo fmt --all -- --check
+
+  doc:
+    name: Build docs
+    needs: [style, test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: "doc --lib --all-features"
+        run: cargo doc --lib --no-deps --all-features

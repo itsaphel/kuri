@@ -1,0 +1,20 @@
+[package]
+name = "kuri_macros"
+version = "0.1.0"
+description = "macros for kuri, the MCP server SDK"
+repository = "https://github.com/itsaphel/kuri"
+homepage = "https://github.com/itsaphel/kuri"
+edition.workspace = true
+license.workspace = true
+publish = true
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn = { version = "2.0", features = ["full", "extra-traits"] }
+quote = "1.0"
+proc-macro2 = "1.0"
+convert_case = "0.6.0"
+# The generated code needs: serde, serde_json, schemars, async-trait
+# These will need to be added as dependencies of the crate that uses kuri's macros
