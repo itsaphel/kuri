@@ -89,3 +89,21 @@ impl From<kuri_mcp_protocol::resource::ResourceError> for RequestError {
         }
     }
 }
+
+impl From<kuri_mcp_protocol::tool::ToolError> for RequestError {
+    fn from(err: kuri_mcp_protocol::tool::ToolError) -> Self {
+        match err {
+            kuri_mcp_protocol::tool::ToolError::NotFound(msg) => RequestError::ToolNotFound(msg),
+            kuri_mcp_protocol::tool::ToolError::InvalidParameters(msg) => {
+                RequestError::InvalidParams(msg)
+            }
+            kuri_mcp_protocol::tool::ToolError::SchemaError(msg) => {
+                RequestError::InvalidParams(msg)
+            }
+            kuri_mcp_protocol::tool::ToolError::ExecutionError(_) => {
+                // This case should've been mapped to a successful result.
+                unreachable!()
+            }
+        }
+    }
+}

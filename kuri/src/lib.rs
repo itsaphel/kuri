@@ -2,6 +2,7 @@ pub mod context;
 pub mod errors;
 mod handler;
 pub mod id;
+pub mod response;
 mod serve;
 mod service;
 pub mod transport;
@@ -13,7 +14,7 @@ pub use service::{MCPService, MCPServiceBuilder};
 
 // re-export certain MCP protocol types
 pub use kuri_mcp_protocol::{
-    prompt::PromptArgument, prompt::PromptError, resource::ResourceError,
+    messages::CallToolResult, prompt::PromptArgument, prompt::PromptError, resource::ResourceError,
     tool::generate_tool_schema, tool::ToolError,
 };
 

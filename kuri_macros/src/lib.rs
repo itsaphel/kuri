@@ -140,28 +140,20 @@ pub fn tool(args: TokenStream, input: TokenStream) -> TokenStream {
     let call_impl = if param_defs.is_empty() {
         // No parameters case
         quote! {
-            async fn call(&self, context: &kuri::context::Context, _params: serde_json::Value) -> Result<serde_json::Value, kuri::ToolError> {
-                // No parameters to deserialize - call function with just context parameters (if any)
-                let result = #fn_name(#(#ctx_param_tokens)*).await
-                    .map_err(|e| kuri::ToolError::ExecutionError(e.to_string()))?;
-
-                Ok(serde_json::to_value(result).expect("should serialize"))
-            }
+            // No parameters to deserialize - call function with just context parameters (if any)
+            let result = #fn_name(#(#ctx_param_tokens)*).await;
+            <_ as kuri::response::IntoCallToolResult>::into_call_tool_result(result)
         }
     } else {
         // With parameters case
         quote! {
-            async fn call(&self, context: &kuri::context::Context, params: serde_json::Value) -> Result<serde_json::Value, kuri::ToolError> {
-                // Deserialize parameters
-                let params: #params_struct_name = serde_json::from_value(params)
-                    .map_err(|e| kuri::ToolError::InvalidParameters("Missing or incorrect tool arguments".into()))?;
+            // Deserialize parameters
+            let params: #params_struct_name = serde_json::from_value(params)
+                .map_err(|e| kuri::ToolError::InvalidParameters("Missing or incorrect tool arguments".into()))?;
 
-                // Call function with parameters
-                let result = #fn_name(#(#ctx_param_tokens)* #(params.#param_names,)*).await
-                    .map_err(|e| kuri::ToolError::ExecutionError(e.to_string()))?;
-
-                Ok(serde_json::to_value(result).expect("should serialize"))
-            }
+            // Call function with parameters
+            let result = #fn_name(#(#ctx_param_tokens)* #(params.#param_names,)*).await;
+            <_ as kuri::response::IntoCallToolResult>::into_call_tool_result(result)
         }
     };
 
@@ -191,7 +183,10 @@ pub fn tool(args: TokenStream, input: TokenStream) -> TokenStream {
                     .expect("Failed to generate schema")
             }
 
-            #call_impl
+            #[allow(unused_variables)]
+            async fn call(&self, context: &kuri::context::Context, params: serde_json::Value) -> Result<kuri::CallToolResult, kuri::ToolError> {
+                { #call_impl }
+            }
         }
     };
 
