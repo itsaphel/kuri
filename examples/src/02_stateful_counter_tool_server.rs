@@ -1,8 +1,7 @@
 use anyhow::Result;
-use kuri::{MCPServiceBuilder, Server, ToolError, context::Inject, tool, transport::ByteTransport};
+use kuri::{MCPServiceBuilder, ToolError, context::Inject, serve, tool, transport::StdioTransport};
 use serde::Deserialize;
 use std::sync::atomic::{AtomicI32, Ordering};
-use tokio::io::{stdin, stdout};
 use tracing_subscriber::EnvFilter;
 
 #[derive(Default, Deserialize)]
@@ -58,13 +57,13 @@ async fn main() -> Result<()> {
     .with_state(Inject::new(Counter::default()))
     .build();
 
-    // Create and run the server over the stdio transport
-    let server = Server::new(service);
-    let transport = ByteTransport::new(stdin(), stdout());
-
     tracing::info!(
-        "Server started over stdin/stdout. Logging to {}. Ready to accept requests",
+        "Starting server over stdin/stdout. Logging to {}",
         log_dir.path().display()
     );
-    Ok(server.run(transport).await?)
+
+    // Serve over the stdio transport
+    serve(service, StdioTransport::new()).await?;
+
+    Ok(())
 }
