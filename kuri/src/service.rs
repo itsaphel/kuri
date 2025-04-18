@@ -13,7 +13,6 @@ use kuri_mcp_protocol::{
     prompt::{Prompt, PromptError, PromptMessage, PromptMessageRole},
     resource::{ResourceContents, ResourceError},
     tool::ToolError,
-    Content,
 };
 use serde_json::json;
 use serde_json::Value;
@@ -159,7 +158,7 @@ trait MCPServiceTrait: 'static {
         &self,
         tool_name: &str,
         arguments: Value,
-    ) -> Pin<Box<dyn Future<Output = Result<Vec<Content>, ToolError>> + '_>>;
+    ) -> Pin<Box<dyn Future<Output = Result<CallToolResult, ToolError>> + '_>>;
     fn list_resources(&self) -> Vec<kuri_mcp_protocol::resource::Resource>;
     fn read_resource(
         &self,
@@ -221,7 +220,7 @@ impl MCPServiceTrait for MCPService {
         &self,
         tool_name: &str,
         arguments: serde_json::Value,
-    ) -> Pin<Box<dyn Future<Output = Result<Vec<Content>, ToolError>> + '_>> {
+    ) -> Pin<Box<dyn Future<Output = Result<CallToolResult, ToolError>> + '_>> {
         let tool = match self.tools.get(tool_name) {
             Some(tool) => tool,
             None => {
@@ -230,21 +229,7 @@ impl MCPServiceTrait for MCPService {
                 ))))
             }
         };
-        Box::pin(async move {
-            let res = tool.call(&self.ctx, arguments).await?;
-            let contents = match res {
-                serde_json::Value::Number(n) => vec![Content::text(n.to_string())],
-                serde_json::Value::String(s) => vec![Content::text(s)],
-                serde_json::Value::Bool(b) => vec![Content::text(b.to_string())],
-                serde_json::Value::Array(_) => serde_json::from_value(res)
-                    .map_err(|e| ToolError::ExecutionError(e.to_string()))?,
-                serde_json::Value::Null => vec![],
-                serde_json::Value::Object(_) => serde_json::from_value(res)
-                    .map_err(|e| ToolError::ExecutionError(e.to_string()))?,
-            };
-
-            Ok(contents)
-        })
+        Box::pin(async move { tool.call(&self.ctx, arguments).await })
     }
 
     fn list_resources(&self) -> Vec<kuri_mcp_protocol::resource::Resource> {
@@ -379,35 +364,8 @@ impl MCPService {
             let arguments = params.get("arguments").cloned().unwrap_or(Value::Null);
 
             // Call tool and build response content
-            let result = match self.call_tool(name, arguments).await {
-                Ok(result) => CallToolResult {
-                    content: result,
-                    is_error: None,
-                },
-                Err(err) => {
-                    match err {
-                        // Unknown tools or invalid arguments are treat as JSON-RPC errors.
-                        // See spec: https://spec.modelcontextprotocol.io/specification/2025-03-26/server/tools/#error-handling
-                        ToolError::NotFound(e) => {
-                            return Err(RequestError::InvalidParams(format!(
-                                "Tool not found: {}",
-                                e
-                            )));
-                        }
-                        ToolError::InvalidParameters(e) => {
-                            return Err(RequestError::InvalidParams(format!(
-                                "Invalid tool arguments: {}",
-                                e
-                            )));
-                        }
-                        // Tool execution errors or schema errors are reported as a result.
-                        _ => CallToolResult {
-                            content: vec![Content::text(err.to_string())],
-                            is_error: Some(true),
-                        },
-                    }
-                }
-            };
+            let result = self.call_tool(name, arguments).await?;
+
             // Serialise response
             let result = serde_json::to_value(result)
                 .map_err(|e| RequestError::Internal(format!("JSON serialization error: {}", e)))?;

@@ -1,5 +1,5 @@
 use anyhow::Result;
-use kuri::{MCPServiceBuilder, ToolError, context::Inject, serve, tool, transport::StdioTransport};
+use kuri::{MCPServiceBuilder, context::Inject, serve, tool, transport::StdioTransport};
 use serde::Deserialize;
 use std::sync::atomic::{AtomicI32, Ordering};
 use tracing_subscriber::EnvFilter;
@@ -13,23 +13,21 @@ struct Counter {
     description = "Increment the counter by a specified quantity",
     params(quantity = "How much to increment the counter by")
 )]
-async fn increment(counter: Inject<Counter>, quantity: u32) -> Result<(), ToolError> {
+async fn increment(counter: Inject<Counter>, quantity: u32) -> () {
     counter.inner.fetch_add(quantity as i32, Ordering::SeqCst);
-    Ok(())
 }
 
 #[tool(
     description = "Decrement the counter by a specified quantity",
     params(quantity = "How much to decrement the counter by")
 )]
-async fn decrement(counter: Inject<Counter>, quantity: u32) -> Result<(), ToolError> {
+async fn decrement(counter: Inject<Counter>, quantity: u32) -> () {
     counter.inner.fetch_sub(quantity as i32, Ordering::SeqCst);
-    Ok(())
 }
 
 #[tool(description = "Get current value of counter")]
-async fn get_value(counter: Inject<Counter>) -> Result<i32, ToolError> {
-    Ok(counter.inner.load(Ordering::SeqCst))
+async fn get_value(counter: Inject<Counter>) -> i32 {
+    counter.inner.load(Ordering::SeqCst)
 }
 
 #[tokio::main(flavor = "current_thread")]
