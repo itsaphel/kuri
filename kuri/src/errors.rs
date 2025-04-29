@@ -39,42 +39,21 @@ pub enum RequestError {
 impl From<RequestError> for kuri_mcp_protocol::jsonrpc::ErrorData {
     fn from(err: RequestError) -> Self {
         use kuri_mcp_protocol::jsonrpc::{ErrorCode, ErrorData};
-        match err {
-            RequestError::MethodNotFound(msg) => ErrorData {
-                code: ErrorCode::MethodNotFound,
-                message: msg,
-                data: None,
-            },
-            RequestError::InvalidParams(msg) => ErrorData {
-                code: ErrorCode::InvalidParams,
-                message: msg,
-                data: None,
-            },
-            RequestError::Internal(msg) => ErrorData {
-                code: ErrorCode::InternalError,
-                message: msg,
-                data: None,
-            },
-            RequestError::ToolNotFound(msg) => ErrorData {
-                code: ErrorCode::InvalidRequest,
-                message: msg,
-                data: None,
-            },
-            RequestError::ResourceNotFound(msg) => ErrorData {
-                code: ErrorCode::InvalidRequest,
-                message: msg,
-                data: None,
-            },
-            RequestError::PromptNotFound(msg) => ErrorData {
-                code: ErrorCode::InvalidRequest,
-                message: msg,
-                data: None,
-            },
-            RequestError::Unsupported(msg) => ErrorData {
-                code: ErrorCode::InvalidRequest,
-                message: msg,
-                data: None,
-            },
+
+        let code = match err {
+            RequestError::MethodNotFound(_) => ErrorCode::MethodNotFound,
+            RequestError::InvalidParams(_) => ErrorCode::InvalidParams,
+            RequestError::Internal(_) => ErrorCode::InternalError,
+            RequestError::ToolNotFound(_) => ErrorCode::InvalidParams,
+            RequestError::ResourceNotFound(_) => ErrorCode::InvalidParams,
+            RequestError::PromptNotFound(_) => ErrorCode::InvalidParams,
+            RequestError::Unsupported(_) => ErrorCode::InvalidRequest,
+        };
+
+        ErrorData {
+            code,
+            message: err.to_string(),
+            data: None,
         }
     }
 }

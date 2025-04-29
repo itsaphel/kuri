@@ -169,12 +169,21 @@ fn validate_tools_list(response: JsonRpcResponse) {
 #[tokio::test]
 async fn test_tools_call_simple_text() {
     let mut server = init_tool_server_simple();
+    verify_calculator(&mut server, "calculator").await;
+}
 
+#[tokio::test]
+async fn test_tools_call_no_tool_descriptions() {
+    let mut server = init_tool_server_no_desc();
+    verify_calculator(&mut server, "calculator_no_desc").await;
+}
+
+async fn verify_calculator(server: &mut MCPService, tool_name: &str) {
     let response = call_server(
-        &mut server,
+        server,
         "tools/call",
         serde_json::json!({
-            "name": "calculator",
+            "name": tool_name,
             "arguments": {
                 "x": 1,
                 "y": 2,
@@ -229,7 +238,7 @@ async fn test_tools_call_with_invalid_parameters() {
             assert_eq!(error.code, ErrorCode::InvalidParams);
             assert_eq!(
                 error.message,
-                "Invalid tool arguments: Missing or incorrect tool arguments"
+                "Invalid parameters: Missing or incorrect tool arguments"
             );
         }
         _ => {
@@ -261,7 +270,7 @@ async fn test_tools_call_with_invalid_parameters() {
             assert_eq!(error.code, ErrorCode::InvalidParams);
             assert_eq!(
                 error.message,
-                "Invalid tool arguments: Missing or incorrect tool arguments"
+                "Invalid parameters: Missing or incorrect tool arguments"
             );
         }
     }
@@ -512,7 +521,10 @@ async fn test_prompts_get_invalid_prompt() {
         JsonRpcResponse::Error { id, error, .. } => {
             assert_eq!(id, RequestId::Num(1));
             assert_eq!(error.code, ErrorCode::InvalidParams);
-            assert_eq!(error.message, "Prompt not found: some_invalid_prompt");
+            assert_eq!(
+                error.message,
+                "Invalid parameters: Prompt not found: some_invalid_prompt"
+            );
         }
         _ => {
             panic!("Expected error response");
