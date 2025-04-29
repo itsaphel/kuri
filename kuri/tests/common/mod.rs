@@ -35,6 +35,11 @@ pub async fn calculator(x: i32, y: i32, operation: String) -> Result<i32, ToolEr
     }
 }
 
+#[tool]
+pub async fn calculator_no_desc(x: i32, y: i32, operation: String) -> Result<i32, ToolError> {
+    calculator(x, y, operation).await
+}
+
 #[derive(Default, Deserialize)]
 struct Counter {
     inner: AtomicI32,
@@ -44,23 +49,21 @@ struct Counter {
     description = "Increment the counter by a specified quantity",
     params(quantity = "How much to increment the counter by")
 )]
-async fn increment(counter: Inject<Counter>, quantity: u32) -> Result<(), ToolError> {
+async fn increment(counter: Inject<Counter>, quantity: u32) {
     counter.inner.fetch_add(quantity as i32, Ordering::SeqCst);
-    Ok(())
 }
 
 #[tool(
     description = "Decrement the counter by a specified quantity",
     params(quantity = "How much to decrement the counter by")
 )]
-async fn decrement(counter: Inject<Counter>, quantity: u32) -> Result<(), ToolError> {
+async fn decrement(counter: Inject<Counter>, quantity: u32) {
     counter.inner.fetch_sub(quantity as i32, Ordering::SeqCst);
-    Ok(())
 }
 
 #[tool(description = "Get current value of counter")]
-async fn get_value(counter: Inject<Counter>) -> Result<i32, ToolError> {
-    Ok(counter.inner.load(Ordering::SeqCst))
+async fn get_value(counter: Inject<Counter>) -> i32 {
+    counter.inner.load(Ordering::SeqCst)
 }
 
 #[prompt(
@@ -101,6 +104,20 @@ pub fn init_tool_server_simple() -> MCPService {
         "Test calculator server".to_string(),
     )
     .with_tool(Calculator)
+    .build()
+}
+
+pub fn init_tool_server_no_desc() -> MCPService {
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter(EnvFilter::from_default_env())
+        .with_test_writer()
+        .try_init();
+
+    MCPServiceBuilder::new(
+        "Calculator".to_string(),
+        "Test calculator server".to_string(),
+    )
+    .with_tool(CalculatorNoDesc)
     .build()
 }
 
