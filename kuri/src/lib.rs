@@ -56,9 +56,47 @@
 //!
 //! # Middleware and layers
 //!
-//! You can re-use anything from the [`tower`] ecosystem.
+//! Like axum, kuri does not have its own bespoke middleware system, and instead utilises the tower
+//! ecosystem of middleware. This means you can use anything from [`tower`], [`axum`], or [`tonic`]
+//! (gRPC). Middleware can be used to implement functionality like authorisation and logging. More
+//! generally, anything that needs to happen before, after, or intercepts a request to a tool, prompt,
+//! or resource, can be implemented using tower layers with kuri.
 //!
-//! ...
+//! We provide [an example][middleware example] of integrating tracing using a layer. Tower also
+//! provides [a guide][tower guide to writing middleware] to get started writing middleware.
+//!
+//! ## Global middleware
+//!
+//! If your middleware needs to run on all invocations, you can apply the `.layer` using tower's
+//! [`ServiceBuilder`]:
+//! ```rust,ignore
+//! use kuri::{MCPServiceBuilder, middleware::tracing::TracingLayer};
+//! use tower::ServiceBuilder;
+//!
+//! let service = MCPServiceBuilder::new(
+//!     "Calculator".to_string(),
+//!     "This server provides a `calculator` tool that can perform basic arithmetic operations."
+//!         .to_string(),
+//! )
+//! .with_tool(Calculator)
+//! .build();
+//!
+//! let final_service = ServiceBuilder::new()
+//!     // Add tracing middleware
+//!     .layer(TracingLayer::new())
+//!     // Route to the MCP service
+//!     .service(service);
+//! ```
+//!
+//! In this case, the layers are applied in order of declaration, before finally routing the request
+//! to the MCP service. On return, the handlers are called in reverse order. So the first declared
+//! layer will be the first to process an incoming request, and the last to process an outgoing
+//! response.
+//!
+//! ## Per-[tool/prompt/resource] middleware
+//!
+//! For now, you will need to add the code to your handler to invoke your middleware. We're still
+//! working on making this more ergonomic within kuri.
 //!
 //! # Sharing state with handlers
 //!
@@ -122,11 +160,15 @@
 //! [examples]: https://github.com/itsaphel/kuri/tree/main/examples
 //! [tower]: https://github.com/tokio-rs/tower
 //! [counter example]: https://github.com/itsaphel/kuri/tree/main/examples/02_stateful_counter_tool_server.rs
+//! [middleware example]: https://github.com/itsaphel/kuri/tree/main/examples/04_hyper_middleware.rs
+//! [`ServiceBuilder`]: https://TODO
+//! [tower guide to writing middleware]: https://TODO
 
 pub mod context;
 pub mod errors;
 mod handler;
 pub mod id;
+pub mod middleware;
 pub mod response;
 mod serve;
 mod service;

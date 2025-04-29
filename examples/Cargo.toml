@@ -13,6 +13,7 @@ schemars = "0.8"
 async-trait = "0.1"
 anyhow = "1.0"
 tempfile = "3.19"
+tower = "0.5"
 tracing = "0.1"
 tracing-appender = "0.2"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
@@ -33,3 +34,7 @@ path = "src/02_stateful_counter_tool_server.rs"
 [[example]]
 name = "03_prompt_server"
 path = "src/03_prompt_server.rs"
+
+[[example]]
+name = "04_hyper_middleware"
+path = "src/04_hyper_middleware.rs"
