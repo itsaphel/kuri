@@ -127,6 +127,7 @@ pub mod context;
 pub mod errors;
 mod handler;
 pub mod id;
+pub mod middleware;
 pub mod response;
 mod serve;
 mod service;
