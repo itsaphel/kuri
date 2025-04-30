@@ -29,7 +29,7 @@ pub trait IntoCallToolResult {
 fn successful_text_response<S: Into<String>>(text: S) -> Result<CallToolResult, ToolError> {
     Ok(CallToolResult {
         content: vec![Content::text(text)],
-        is_error: None,
+        is_error: false,
     })
 }
 
@@ -55,7 +55,7 @@ impl IntoCallToolResult for Vec<Content> {
     fn into_call_tool_result(self) -> Result<CallToolResult, ToolError> {
         Ok(CallToolResult {
             content: self,
-            is_error: None,
+            is_error: false,
         })
     }
 }
@@ -64,7 +64,7 @@ impl IntoCallToolResult for () {
     fn into_call_tool_result(self) -> Result<CallToolResult, ToolError> {
         Ok(CallToolResult {
             content: vec![],
-            is_error: None,
+            is_error: false,
         })
     }
 }
@@ -84,7 +84,7 @@ where
                 // Map ExecutionError to Ok result with error content
                 ToolError::ExecutionError(msg) => Ok(CallToolResult {
                     content: vec![Content::text(format!("Error: {}", msg))],
-                    is_error: Some(true),
+                    is_error: true,
                 }),
                 // Propagate other ToolError variants directly
                 other_err => Err(other_err),
@@ -104,7 +104,7 @@ where
             Ok(value) => value.into_call_tool_result(),
             Err(err) => Ok(CallToolResult {
                 content: vec![Content::text(err.to_string())],
-                is_error: Some(true),
+                is_error: true,
             }),
         }
     }

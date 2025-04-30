@@ -124,8 +124,8 @@ pub struct ListToolsResult {
 #[serde(rename_all = "camelCase")]
 pub struct CallToolResult {
     pub content: Vec<Content>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub is_error: Option<bool>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub is_error: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -146,4 +146,24 @@ pub struct GetPromptResult {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     pub messages: Vec<PromptMessage>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_call_tool_result_deserialisation() {
+        let msg = r#"{"content": [], "isError": false}"#;
+        let result: CallToolResult = serde_json::from_str(msg).unwrap();
+        assert!(!result.is_error);
+
+        let msg = r#"{"content": [], "isError": true}"#;
+        let result: CallToolResult = serde_json::from_str(msg).unwrap();
+        assert!(result.is_error);
+
+        let msg = r#"{"content": []}"#;
+        let result: CallToolResult = serde_json::from_str(msg).unwrap();
+        assert!(!result.is_error);
+    }
 }

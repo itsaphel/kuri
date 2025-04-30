@@ -205,7 +205,7 @@ async fn verify_calculator(server: &mut MCPService, tool_name: &str) {
                     text: "3".to_string(),
                     annotations: None,
                 })],
-                is_error: None,
+                is_error: false,
             };
             assert_eq!(actual.content[0], expected.content[0]);
             assert_eq!(actual.is_error, expected.is_error);
@@ -328,7 +328,7 @@ async fn test_tools_call_with_context() {
             let actual: CallToolResult = serde_json::from_value(result).unwrap();
             let expected = CallToolResult {
                 content: vec![],
-                is_error: None,
+                is_error: false,
             };
             assert_eq!(actual.content, expected.content);
             assert_eq!(actual.is_error, expected.is_error);
@@ -359,7 +359,7 @@ async fn test_tools_call_with_context() {
                     text: "1".to_string(),
                     annotations: None,
                 })],
-                is_error: None,
+                is_error: false,
             };
             assert_eq!(actual.content, expected.content);
             assert_eq!(actual.is_error, expected.is_error);
@@ -387,7 +387,7 @@ async fn test_tools_call_with_context() {
                     text: "1".to_string(),
                     annotations: None,
                 })],
-                is_error: None,
+                is_error: false,
             };
             assert_eq!(actual.content, expected.content);
             assert_eq!(actual.is_error, expected.is_error);
