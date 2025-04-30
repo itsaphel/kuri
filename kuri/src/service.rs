@@ -282,6 +282,21 @@ impl MCPServiceTrait for MCPService {
     }
 }
 
+/// Validate and return request parameters
+fn get_request_params(
+    params: Option<Params>,
+) -> Result<serde_json::Map<String, Value>, RequestError> {
+    match params {
+        Some(Params::Map(map)) => Ok(map),
+        Some(_) => Err(RequestError::InvalidParams(
+            "Parameters must be a map-like object".to_string(),
+        )),
+        None => Err(RequestError::InvalidParams(
+            "The request was empty".to_string(),
+        )),
+    }
+}
+
 /// Note: Handlers only perform *syntactic* validation. For instance, that required arguments are
 /// provided, or that they're (immediately) of the correct type. The methods on `MCPServiceTrait`
 /// are ultimately responsible for verifying the *semantic* correctness of the arguments, including
@@ -345,16 +360,8 @@ impl MCPService {
         req: JsonRpcRequest,
     ) -> impl Future<Output = Result<JsonRpcResponse, RequestError>> + '_ {
         async move {
-            // Validate request parameters
-            let params = match req.params {
-                Some(Params::Map(map)) => map,
-                Some(_) => {
-                    return Err(RequestError::InvalidParams(
-                        "Parameters must be a map-like object".into(),
-                    ))
-                }
-                None => return Err(RequestError::InvalidParams("The request was empty".into())),
-            };
+            // Get and validate request parameters
+            let params = get_request_params(req.params)?;
 
             let name = params
                 .get("name")
@@ -398,16 +405,8 @@ impl MCPService {
         req: JsonRpcRequest,
     ) -> impl Future<Output = Result<JsonRpcResponse, RequestError>> + '_ {
         async move {
-            // Validate request parameters
-            let params = match req.params {
-                Some(Params::Map(map)) => map,
-                Some(_) => {
-                    return Err(RequestError::InvalidParams(
-                        "Parameters must be a map-like object".into(),
-                    ))
-                }
-                None => return Err(RequestError::InvalidParams("Missing parameters".into())),
-            };
+            // Get and validate request parameters
+            let params = get_request_params(req.params)?;
 
             let uri = params
                 .get("uri")
@@ -455,16 +454,8 @@ impl MCPService {
         req: JsonRpcRequest,
     ) -> impl Future<Output = Result<JsonRpcResponse, RequestError>> + '_ {
         async move {
-            // Validate request parameters
-            let params = match req.params {
-                Some(Params::Map(map)) => map,
-                Some(_) => {
-                    return Err(RequestError::InvalidParams(
-                        "Parameters must be a map-like object when calling `prompts/get`".into(),
-                    ))
-                }
-                None => return Err(RequestError::InvalidParams("Missing parameters".into())),
-            };
+            // Get and validate request parameters
+            let params = get_request_params(req.params)?;
 
             let prompt_name = params
                 .get("name")
