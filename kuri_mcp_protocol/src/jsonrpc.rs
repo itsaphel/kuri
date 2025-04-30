@@ -36,6 +36,15 @@ impl From<JsonRpcNotification> for SendableMessage {
 pub enum RequestId {
     Num(u64),
     Str(String),
+    /// No id (used for request errors and notifications)
+    Null,
+}
+
+impl RequestId {
+    #[inline]
+    pub const fn is_null(&self) -> bool {
+        matches!(self, RequestId::Null)
+    }
 }
 
 /// Structured parameters which may be included in a request or notification.
@@ -213,6 +222,17 @@ pub struct ErrorData {
     pub data: Option<Value>,
 }
 
+impl ErrorData {
+    /// Create a new error data instance, with no additional data.
+    pub fn new(code: ErrorCode, message: String) -> Self {
+        Self {
+            code,
+            message,
+            data: None,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -240,11 +260,12 @@ mod tests {
             RequestId::Str("4a54203b-20c0-4367-a15b-938ec6d92bf2".to_owned())
         );
 
-        let s = r#"[0, 2, "3"]"#;
+        let s = r#"[null, 0, 2, "3"]"#;
         let deserialized: Vec<RequestId> = serde_json::from_str(s).unwrap();
         assert_eq!(
             deserialized,
             vec![
+                RequestId::Null,
                 RequestId::Num(0),
                 RequestId::Num(2),
                 RequestId::Str("3".into())
@@ -301,6 +322,10 @@ mod tests {
             serialized,
             r#"{"jsonrpc":"2.0","id":1,"method":"test","params":{"key":"value","key2":"value2"}}"#
         );
+
+        let request = JsonRpcRequest::new(RequestId::Null, "test".to_string(), None);
+        let serialized = serde_json::to_string(&request).unwrap();
+        assert_eq!(serialized, r#"{"jsonrpc":"2.0","id":null,"method":"test"}"#);
     }
 
     #[test]

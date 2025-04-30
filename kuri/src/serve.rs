@@ -1,42 +1,40 @@
-use crate::{errors::ServerError, transport::TransportError};
+use crate::transport::{MessageParseError, TransportError};
 use futures::{SinkExt, StreamExt};
-use kuri_mcp_protocol::jsonrpc::{JsonRpcResponse, SendableMessage};
+use kuri_mcp_protocol::jsonrpc::{
+    ErrorCode, ErrorData, JsonRpcResponse, RequestId, SendableMessage,
+};
 use std::convert::Infallible;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_util::codec::{Framed, LinesCodec, LinesCodecError};
 use tower::Service;
 
 /// Ensure the JSON value is a valid JSON-RPC 2.0 message.
-fn validate_jsonrpc_message(value: &serde_json::Value) -> Result<(), TransportError> {
+fn validate_jsonrpc_message(value: &serde_json::Value) -> Result<(), MessageParseError> {
     if !value.is_object() {
-        return Err(TransportError::InvalidMessage(
-            "Message must be a JSON object".to_string(),
-        ));
+        return Err(MessageParseError::NotJsonRpc2Message);
     }
     // Safe due to check above
     let obj = value.as_object().unwrap();
 
     // Check JSON-RPC version field
     if !obj.contains_key("jsonrpc") || obj["jsonrpc"] != "2.0" {
-        return Err(TransportError::InvalidMessage(
-            "Missing or invalid JSON-RPC version".to_string(),
-        ));
+        return Err(MessageParseError::NotJsonRpc2Message);
     }
 
     Ok(())
 }
 
-// Parse a line into a SendableMessage
+/// Parse a line into a SendableMessage
 async fn parse_message(
     line: Result<String, LinesCodecError>,
-) -> Result<SendableMessage, TransportError> {
+) -> Result<SendableMessage, MessageParseError> {
     let line = line?;
-    let value =
-        serde_json::from_str::<serde_json::Value>(&line).map_err(TransportError::Serialisation)?;
+    let value = serde_json::from_str::<serde_json::Value>(&line)
+        .map_err(MessageParseError::Deserialisation)?;
 
     validate_jsonrpc_message(&value)?;
 
-    serde_json::from_value::<SendableMessage>(value).map_err(TransportError::Serialisation)
+    serde_json::from_value::<SendableMessage>(value).map_err(MessageParseError::Deserialisation)
 }
 
 /// Write a JSON-RPC response on the transport.
@@ -86,7 +84,7 @@ where
     Ok(())
 }
 
-async fn handle_connection<S, T>(mut service: S, transport: T) -> Result<(), ServerError>
+async fn handle_connection<S, T>(mut service: S, transport: T) -> Result<(), TransportError>
 where
     S: Service<SendableMessage, Response = Option<JsonRpcResponse>, Error = Infallible>,
     T: AsyncRead + AsyncWrite + Unpin,
@@ -104,11 +102,30 @@ where
                 }
             }
             Err(e) => {
-                // log an error, but don't terminate the connection; we continue looping
-                if matches!(e, TransportError::Serialisation(_)) {
-                    tracing::debug!(error = ?e, "Transport error (serialization)");
-                } else {
-                    tracing::error!(error = ?e, "Transport error");
+                // per JSON-RPC spec, we should respond with an "Invalid Request" error
+                // see: https://www.jsonrpc.org/specification#examples
+                match e {
+                    MessageParseError::NotJsonRpc2Message => {
+                        let error_data = ErrorData::new(
+                            ErrorCode::InvalidRequest,
+                            "Message is not a JSON-RPC 2.0 message".to_string(),
+                        );
+                        let msg = JsonRpcResponse::error(RequestId::Null, error_data);
+                        write_message(&mut frame, msg).await?;
+                    }
+                    MessageParseError::Deserialisation(_) => {
+                        let error_data = ErrorData::new(
+                            ErrorCode::ParseError,
+                            "JSON parsing error when deserialising the message".to_string(),
+                        );
+                        let msg = JsonRpcResponse::error(RequestId::Null, error_data);
+                        write_message(&mut frame, msg).await?;
+                        tracing::debug!(error = ?e, "Transport error (deserialisation)");
+                    }
+                    MessageParseError::LinesCodecError(_) => {
+                        // Transport error. But don't terminate the connection: we continue looping
+                        tracing::error!(error = ?e, "Transport error");
+                    }
                 }
             }
         }
@@ -118,7 +135,7 @@ where
 }
 
 /// Serve a MCP Service over a transport layer.
-pub async fn serve<S, T>(service: S, transport: T) -> Result<(), ServerError>
+pub async fn serve<S, T>(service: S, transport: T) -> Result<(), TransportError>
 where
     S: Service<SendableMessage, Response = Option<JsonRpcResponse>, Error = Infallible>,
     T: AsyncRead + AsyncWrite + Unpin,
