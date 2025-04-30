@@ -1,14 +1,8 @@
-use crate::transport::TransportError;
 use thiserror::Error;
 
-/// Fatal errors which cause the `Server` to terminate.
-#[derive(Error, Debug)]
-pub enum ServerError {
-    #[error("Transport error: {0}")]
-    Transport(#[from] TransportError),
-}
-
-/// Errors raised while processing a request.
+/// Errors raised while *processing* a request.
+/// These errors assume that the request is valid and was successfully parsed. Errors for invalid
+/// requests are handled at the transport level, within [`MessageParseError`].
 #[derive(Error, Debug)]
 pub enum RequestError {
     #[error("Method not found: {0}")]
@@ -50,11 +44,7 @@ impl From<RequestError> for kuri_mcp_protocol::jsonrpc::ErrorData {
             RequestError::Unsupported(_) => ErrorCode::InvalidRequest,
         };
 
-        ErrorData {
-            code,
-            message: err.to_string(),
-            data: None,
-        }
+        ErrorData::new(code, err.to_string())
     }
 }
 
