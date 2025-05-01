@@ -24,7 +24,7 @@ fn validate_jsonrpc_message(value: &serde_json::Value) -> Result<(), MessagePars
     Ok(())
 }
 
-// Parse a line into a SendableMessage
+/// Parse a line into a SendableMessage
 async fn parse_message(
     line: Result<String, LinesCodecError>,
 ) -> Result<SendableMessage, MessageParseError> {
@@ -102,27 +102,30 @@ where
                 }
             }
             Err(e) => {
-                // log an error, but don't terminate the connection; we continue looping
-
                 // per JSON-RPC spec, we should respond with an "Invalid Request" error
                 // see: https://www.jsonrpc.org/specification#examples
-                if matches!(e, MessageParseError::Deserialisation(_)) {
-                    let error_data = ErrorData::new(
-                        ErrorCode::ParseError,
-                        format!("JSON parsing error when deserialising the message"),
-                    );
-                    let msg = JsonRpcResponse::error(RequestId::Null, error_data);
-                    write_message(&mut frame, msg).await?;
-                    tracing::debug!(error = ?e, "Transport error (deserialisation)");
-                } else if matches!(e, MessageParseError::NotJsonRpc2Message) {
-                    let error_data = ErrorData::new(
-                        ErrorCode::InvalidRequest,
-                        format!("Message is not a JSON-RPC 2.0 message"),
-                    );
-                    let msg = JsonRpcResponse::error(RequestId::Null, error_data);
-                    write_message(&mut frame, msg).await?;
-                } else {
-                    tracing::error!(error = ?e, "Transport error");
+                match e {
+                    MessageParseError::NotJsonRpc2Message => {
+                        let error_data = ErrorData::new(
+                            ErrorCode::ParseError,
+                            format!("JSON parsing error when deserialising the message"),
+                        );
+                        let msg = JsonRpcResponse::error(RequestId::Null, error_data);
+                        write_message(&mut frame, msg).await?;
+                        tracing::debug!(error = ?e, "Transport error (deserialisation)");
+                    }
+                    MessageParseError::Deserialisation(_) => {
+                        let error_data = ErrorData::new(
+                            ErrorCode::InvalidRequest,
+                            format!("Message is not a JSON-RPC 2.0 message"),
+                        );
+                        let msg = JsonRpcResponse::error(RequestId::Null, error_data);
+                        write_message(&mut frame, msg).await?;
+                    }
+                    MessageParseError::LinesCodecError(_) => {
+                        // Transport error. But don't terminate the connection: we continue looping
+                        tracing::error!(error = ?e, "Transport error");
+                    }
                 }
             }
         }
