@@ -25,9 +25,16 @@ pub trait ToolHandler: 'static {
 
 #[async_trait(?Send)]
 pub trait PromptHandler: 'static {
+    /// The name of the prompt
     fn name(&self) -> &'static str;
+
+    /// A description of what the prompt does
     fn description(&self) -> Option<&'static str>;
+
+    /// The arguments that the prompt accepts
     fn arguments(&self) -> Option<Vec<PromptArgument>>;
+
+    /// Execute the prompt with the given parameters
     async fn call(
         &self,
         context: &Context,
@@ -35,6 +42,7 @@ pub trait PromptHandler: 'static {
     ) -> Result<String, PromptError>;
 }
 
+// TODO: this should really be a macro testcase
 #[cfg(test)]
 mod tests {
     use crate::response::IntoCallToolResult;

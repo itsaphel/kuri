@@ -6,7 +6,9 @@ use std::{
     sync::Arc,
 };
 
-/// Registry of types that may be injected in MCPService tool handlers.
+/// Registry of types that may be injected in MCPService tool handlers. Any state in the Context is
+/// global: it is shared and persisted throughout requests, *not* transient for the lifetime of a
+/// single request.
 ///
 /// Types must be registered when the MCPService is built. Afterwards, this HashMap cannot be modified.
 #[derive(Default)]
@@ -31,8 +33,7 @@ impl Context {
 
 /// A trait to go from a Context to a type T.
 ///
-/// Implementing this for a type allows it to be directly injected into tool
-/// handlers as a parameter.
+/// Implementing this for a type allows it to be directly injected into tool handlers as a parameter.
 pub trait FromContext {
     fn from_context(ctx: &Context) -> Self;
 }
