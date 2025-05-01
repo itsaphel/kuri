@@ -24,6 +24,87 @@ macro_rules! assert_json_eq {
     };
 }
 
+#[tokio::test]
+async fn test_invalid_json() {
+    let response = request(r#"{"jsonrpc": "2.0", "method": "foobar, "params": "bar", "baz]"#).await;
+    assert_json_eq!(
+        &response,
+        r#"{"jsonrpc": "2.0", "error": {"code": -32700, "message": "JSON parsing error when deserialising the message"}, "id": null}"#
+    );
+}
+
+#[tokio::test]
+async fn test_invalid_request() {
+    let response = request(r#"{}"#).await;
+    assert_json_eq!(
+        &response,
+        r#"{"jsonrpc": "2.0", "error": {"code": -32600, "message": "Message is not a JSON-RPC 2.0 message"}, "id": null}"#
+    );
+
+    let response = request(r#"[]"#).await;
+    assert_json_eq!(
+        &response,
+        r#"{"jsonrpc": "2.0", "error": {"code": -32600, "message": "Message is not a JSON-RPC 2.0 message"}, "id": null}"#
+    );
+}
+
+// This test is disabled because we don't currently handle this case correctly (we return a parse error)
+#[tokio::test]
+#[ignore]
+async fn test_invalid_request_untagged() {
+    let response = request(r#"{"jsonrpc": "2.0", "method": 1, "params": "bar"}"#).await;
+    assert_json_eq!(
+        &response,
+        r#"{"jsonrpc":"2.0", "error": {"code": -32600, "message": "Invalid request"}, "id": null}"#
+    );
+}
+
+#[tokio::test]
+async fn test_method_not_found() {
+    let response =
+        request(r#"{"jsonrpc": "2.0", "method": "non_existent_method", "params": {}, "id": 1}"#)
+            .await;
+    assert_json_eq!(
+        &response,
+        r#"{"jsonrpc": "2.0", "error": {"code": -32601, "message": "Method not found: non_existent_method"}, "id": 1}"#
+    );
+}
+
+#[tokio::test]
+async fn test_logical_param_errors() {
+    let response = request(
+        r#"{"jsonrpc": "2.0", "method": "tools/call", "params": {"name": "calculator", "arguments": {"x": "not_a_number", "y": 2, "operation": "add"}}, "id": 1}"#,
+    ).await;
+    assert_json_eq!(
+        &response,
+        r#"{"jsonrpc": "2.0", "error": {"code": -32602, "message": "Invalid parameters: Missing or incorrect tool arguments"}, "id": 1}"#
+    );
+
+    let response = request(
+        r#"{"jsonrpc": "2.0", "method": "tools/call", "params": {"name": "calculator", "arguments": {"x": 1, "y": 2, "operation": "invalid_operation"}}, "id": 1}"#,
+    ).await;
+    assert_json_eq!(
+        &response,
+        r#"{"jsonrpc": "2.0", "error": {"code": -32602, "message": "Invalid parameters: Unknown operation: invalid_operation"}, "id": 1}"#
+    );
+}
+
+#[tokio::test]
+async fn test_incorrect_jsonrpc_version() {
+    let response =
+        request(r#"{"jsonrpc": "1.0", "method": "initialize", "params": {}, "id": 1}"#).await;
+    assert_json_eq!(
+        &response,
+        r#"{"jsonrpc": "2.0", "error": {"code": -32600, "message": "Message is not a JSON-RPC 2.0 message"}, "id": null}"#
+    );
+
+    let response = request(r#"{"method": "initialize", "params": {}, "id": 1}"#).await;
+    assert_json_eq!(
+        &response,
+        r#"{"jsonrpc": "2.0", "error": {"code": -32600, "message": "Message is not a JSON-RPC 2.0 message"}, "id": null}"#
+    );
+}
+
 #[derive(Debug, Clone)]
 struct MockTransport {
     read_buf: Vec<u8>,
@@ -109,85 +190,4 @@ async fn request(input: &str) -> String {
     // // Assert it's serialisable (or not)
     // let response = serde_json::from_str::<JsonRpcResponse>(lines[0])
     //     .expect("No valid JSON-RPC response found");
-}
-
-#[tokio::test]
-async fn test_invalid_json() {
-    let response = request(r#"{"jsonrpc": "2.0", "method": "foobar, "params": "bar", "baz]"#).await;
-    assert_json_eq!(
-        &response,
-        r#"{"jsonrpc": "2.0", "error": {"code": -32700, "message": "JSON parsing error when deserialising the message"}, "id": null}"#
-    );
-}
-
-#[tokio::test]
-async fn test_invalid_request() {
-    let response = request(r#"{}"#).await;
-    assert_json_eq!(
-        &response,
-        r#"{"jsonrpc": "2.0", "error": {"code": -32600, "message": "Message is not a JSON-RPC 2.0 message"}, "id": null}"#
-    );
-
-    let response = request(r#"[]"#).await;
-    assert_json_eq!(
-        &response,
-        r#"{"jsonrpc": "2.0", "error": {"code": -32600, "message": "Message is not a JSON-RPC 2.0 message"}, "id": null}"#
-    );
-}
-
-// This test is disabled because we don't currently handle this case correctly (we return a parse error)
-#[tokio::test]
-#[ignore]
-async fn test_invalid_request_untagged() {
-    let response = request(r#"{"jsonrpc": "2.0", "method": 1, "params": "bar"}"#).await;
-    assert_json_eq!(
-        &response,
-        r#"{"jsonrpc":"2.0", "error": {"code": -32600, "message": "Invalid request"}, "id": null}"#
-    );
-}
-
-#[tokio::test]
-async fn test_method_not_found() {
-    let response =
-        request(r#"{"jsonrpc": "2.0", "method": "non_existent_method", "params": {}, "id": 1}"#)
-            .await;
-    assert_json_eq!(
-        &response,
-        r#"{"jsonrpc": "2.0", "error": {"code": -32601, "message": "Method not found: non_existent_method"}, "id": 1}"#
-    );
-}
-
-#[tokio::test]
-async fn test_logical_param_errors() {
-    let response = request(
-        r#"{"jsonrpc": "2.0", "method": "tools/call", "params": {"name": "calculator", "arguments": {"x": "not_a_number", "y": 2, "operation": "add"}}, "id": 1}"#,
-    ).await;
-    assert_json_eq!(
-        &response,
-        r#"{"jsonrpc": "2.0", "error": {"code": -32602, "message": "Invalid parameters: Missing or incorrect tool arguments"}, "id": 1}"#
-    );
-
-    let response = request(
-        r#"{"jsonrpc": "2.0", "method": "tools/call", "params": {"name": "calculator", "arguments": {"x": 1, "y": 2, "operation": "invalid_operation"}}, "id": 1}"#,
-    ).await;
-    assert_json_eq!(
-        &response,
-        r#"{"jsonrpc": "2.0", "error": {"code": -32602, "message": "Invalid parameters: Unknown operation: invalid_operation"}, "id": 1}"#
-    );
-}
-
-#[tokio::test]
-async fn test_incorrect_jsonrpc_version() {
-    let response =
-        request(r#"{"jsonrpc": "1.0", "method": "initialize", "params": {}, "id": 1}"#).await;
-    assert_json_eq!(
-        &response,
-        r#"{"jsonrpc": "2.0", "error": {"code": -32600, "message": "Message is not a JSON-RPC 2.0 message"}, "id": null}"#
-    );
-
-    let response = request(r#"{"method": "initialize", "params": {}, "id": 1}"#).await;
-    assert_json_eq!(
-        &response,
-        r#"{"jsonrpc": "2.0", "error": {"code": -32600, "message": "Message is not a JSON-RPC 2.0 message"}, "id": null}"#
-    );
 }

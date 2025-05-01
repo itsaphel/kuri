@@ -107,20 +107,20 @@ where
                 match e {
                     MessageParseError::NotJsonRpc2Message => {
                         let error_data = ErrorData::new(
+                            ErrorCode::InvalidRequest,
+                            format!("Message is not a JSON-RPC 2.0 message"),
+                        );
+                        let msg = JsonRpcResponse::error(RequestId::Null, error_data);
+                        write_message(&mut frame, msg).await?;
+                    }
+                    MessageParseError::Deserialisation(_) => {
+                        let error_data = ErrorData::new(
                             ErrorCode::ParseError,
                             format!("JSON parsing error when deserialising the message"),
                         );
                         let msg = JsonRpcResponse::error(RequestId::Null, error_data);
                         write_message(&mut frame, msg).await?;
                         tracing::debug!(error = ?e, "Transport error (deserialisation)");
-                    }
-                    MessageParseError::Deserialisation(_) => {
-                        let error_data = ErrorData::new(
-                            ErrorCode::InvalidRequest,
-                            format!("Message is not a JSON-RPC 2.0 message"),
-                        );
-                        let msg = JsonRpcResponse::error(RequestId::Null, error_data);
-                        write_message(&mut frame, msg).await?;
                     }
                     MessageParseError::LinesCodecError(_) => {
                         // Transport error. But don't terminate the connection: we continue looping
