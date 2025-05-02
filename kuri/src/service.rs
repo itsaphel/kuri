@@ -10,9 +10,9 @@ use kuri_mcp_protocol::{
         ListResourcesResult, ListToolsResult, PromptsCapability, ReadResourceResult,
         ResourcesCapability, ServerCapabilities, ToolsCapability,
     },
-    prompt::{Prompt, PromptError, PromptMessage, PromptMessageRole},
-    resource::{ResourceContents, ResourceError},
-    tool::ToolError,
+    prompt::{Prompt as PromptMeta, PromptError, PromptMessage, PromptMessageRole},
+    resource::{Resource as ResourceMeta, ResourceContents, ResourceError},
+    tool::{Tool as ToolMeta, ToolError},
 };
 use serde_json::json;
 use serde_json::Value;
@@ -153,18 +153,18 @@ trait MCPServiceTrait: 'static {
     fn instructions(&self) -> String;
     fn capabilities(&self) -> ServerCapabilities;
 
-    fn list_tools(&self) -> Vec<kuri_mcp_protocol::tool::Tool>;
+    fn list_tools(&self) -> Vec<ToolMeta>;
     fn call_tool(
         &self,
         tool_name: &str,
         arguments: Value,
     ) -> Pin<Box<dyn Future<Output = Result<CallToolResult, ToolError>> + '_>>;
-    fn list_resources(&self) -> Vec<kuri_mcp_protocol::resource::Resource>;
+    fn list_resources(&self) -> Vec<ResourceMeta>;
     fn read_resource(
         &self,
         uri: &str,
     ) -> Pin<Box<dyn Future<Output = Result<String, ResourceError>> + 'static>>;
-    fn list_prompts(&self) -> Vec<Prompt>;
+    fn list_prompts(&self) -> Vec<PromptMeta>;
     fn get_prompt(
         &self,
         prompt_name: &str,
@@ -201,12 +201,10 @@ impl MCPServiceTrait for MCPService {
     }
 
     /// List tool schema for all tools registered with this MCP server.
-    fn list_tools(&self) -> Vec<kuri_mcp_protocol::tool::Tool> {
+    fn list_tools(&self) -> Vec<ToolMeta> {
         self.tools
             .iter()
-            .map(|(name, tool)| {
-                kuri_mcp_protocol::tool::Tool::new(name.clone(), tool.description(), tool.schema())
-            })
+            .map(|(name, tool)| ToolMeta::new(name.clone(), tool.description(), tool.schema()))
             .collect()
     }
 
@@ -232,7 +230,7 @@ impl MCPServiceTrait for MCPService {
         Box::pin(async move { tool.call(&self.ctx, arguments).await })
     }
 
-    fn list_resources(&self) -> Vec<kuri_mcp_protocol::resource::Resource> {
+    fn list_resources(&self) -> Vec<ResourceMeta> {
         // TODO implement
         vec![]
     }
@@ -248,10 +246,10 @@ impl MCPServiceTrait for MCPService {
     }
 
     /// List prompt schema for all prompts registered with this MCP server.
-    fn list_prompts(&self) -> Vec<Prompt> {
+    fn list_prompts(&self) -> Vec<PromptMeta> {
         self.prompts
             .values()
-            .map(|prompt| Prompt::new(prompt.name(), prompt.description(), prompt.arguments()))
+            .map(|prompt| PromptMeta::new(prompt.name(), prompt.description(), prompt.arguments()))
             .collect()
     }
 
