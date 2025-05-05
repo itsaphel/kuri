@@ -1,5 +1,7 @@
 use anyhow::Result;
-use kuri::{MCPServiceBuilder, context::Inject, serve, tool, transport::StdioTransport};
+use kuri::{
+    context::Inject, serve, tool, transport::StdioTransport, MCPServiceBuilder, ServiceExt
+};
 use serde::Deserialize;
 use std::sync::atomic::{AtomicI32, Ordering};
 use tracing_subscriber::EnvFilter;
@@ -61,7 +63,7 @@ async fn main() -> Result<()> {
     );
 
     // Serve over the stdio transport
-    serve(service, StdioTransport::new()).await?;
+    serve(service.into_request_service(), StdioTransport::new()).await?;
 
     Ok(())
 }

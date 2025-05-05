@@ -3,9 +3,6 @@ use thiserror::Error;
 /// Errors raised when parsing a message
 #[derive(Error, Debug)]
 pub enum MessageParseError {
-    #[error("Message is not a JSON-RPC 2.0 message")]
-    NotJsonRpc2Message,
-
     #[error("Error deserialising message: {0}")]
     Deserialisation(#[from] serde_json::Error),
 

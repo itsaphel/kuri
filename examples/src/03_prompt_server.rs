@@ -1,5 +1,5 @@
 use anyhow::Result;
-use kuri::{MCPServiceBuilder, prompt, serve, transport::StdioTransport};
+use kuri::{prompt, serve, transport::StdioTransport, MCPServiceBuilder, ServiceExt};
 use tracing_subscriber::{self, EnvFilter};
 
 #[prompt(
@@ -53,7 +53,7 @@ async fn main() -> Result<()> {
     .build();
 
     // Serve over the stdio transport
-    serve(service, StdioTransport::new()).await?;
+    serve(service.into_request_service(), StdioTransport::new()).await?;
 
     Ok(())
 }

@@ -1,5 +1,5 @@
 use anyhow::Result;
-use kuri::{MCPServiceBuilder, ToolError, serve, tool, transport::StdioTransport};
+use kuri::{MCPServiceBuilder, ServiceExt, ToolError, serve, tool, transport::StdioTransport};
 use tracing_subscriber::{self, EnvFilter};
 
 #[tool(
@@ -60,7 +60,7 @@ async fn main() -> Result<()> {
     );
 
     // Serve over the stdio transport
-    serve(service, StdioTransport::new()).await?;
+    serve(service.into_request_service(), StdioTransport::new()).await?;
 
     Ok(())
 }

@@ -7,15 +7,17 @@ use serde::{de, Deserialize, Serialize};
 use serde_json::Value;
 use valuable::Valuable;
 
-const JSONRPC_VERSION: &str = "2.0";
-
-/// This type represents messages that can be sent over the transport.
-/// This can be used to ensure we don't initiate communication with a response type.
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+/// A single JSON-RPC message.
+#[derive(Debug, Serialize, Clone, PartialEq)]
 #[serde(untagged)]
 pub enum SendableMessage {
     Request(JsonRpcRequest),
     Notification(JsonRpcNotification),
+    Invalid {
+        /// call ID (if known)
+        #[serde(default = "RequestId::null")]
+        id: RequestId,
+    },
 }
 
 impl From<JsonRpcRequest> for SendableMessage {
@@ -30,6 +32,103 @@ impl From<JsonRpcNotification> for SendableMessage {
     }
 }
 
+impl<'de> serde::Deserialize<'de> for SendableMessage {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = serde_json::Value::deserialize(deserializer)?;
+        if let Ok(req) = MethodCall::deserialize(&value) {
+            return Ok(SendableMessage::Request(req));
+        }
+        if let Ok(note) = Notification::deserialize(&value) {
+            return Ok(SendableMessage::Notification(note));
+        }
+
+        // Invalid message. Extract ID if possible.
+        let id = match &value {
+            serde_json::Value::Object(map) => map
+                .get("id")
+                .and_then(|id_val| RequestId::deserialize(id_val).ok())
+                .unwrap_or_else(RequestId::null),
+            _ => RequestId::Null,
+        };
+        Ok(SendableMessage::Invalid { id })
+    }
+}
+
+/// A single JSON-RPC request, which is sent over the transport, and may contain multiple messages
+/// (per JSON-RPC's batch specification).
+#[derive(Debug, Serialize, Clone, PartialEq)]
+pub enum Request {
+    /// Single message
+    Single(SendableMessage),
+    /// Batch of messages
+    Batch(Vec<SendableMessage>),
+}
+
+impl<'de> serde::Deserialize<'de> for Request {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        use serde::de::{self, MapAccess, SeqAccess, Visitor};
+        use std::fmt;
+
+        struct RequestVisitor;
+
+        impl<'de> Visitor<'de> for RequestVisitor {
+            type Value = Request;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a JSON-RPC request or batch of requests")
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Request, A::Error>
+            where
+                A: SeqAccess<'de>,
+            {
+                let mut messages = Vec::new();
+                while let Some(msg) = seq.next_element::<SendableMessage>()? {
+                    messages.push(msg);
+                }
+                Ok(Request::Batch(messages))
+            }
+
+            fn visit_map<M>(self, map: M) -> Result<Request, M::Error>
+            where
+                M: MapAccess<'de>,
+            {
+                let value = serde_json::Value::deserialize(
+                    serde::de::value::MapAccessDeserializer::new(map),
+                )?;
+                let msg = SendableMessage::deserialize(value).map_err(de::Error::custom)?;
+                Ok(Request::Single(msg))
+            }
+        }
+
+        deserializer.deserialize_any(RequestVisitor)
+    }
+}
+
+/// A single JSON-RPC response, which is sent over the transport.
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[serde(untagged)]
+pub enum Response {
+    /// Single message
+    Single(Option<JsonRpcResponse>),
+    /// Batch of messages
+    Batch(Vec<JsonRpcResponse>),
+}
+
+impl Response {
+    pub fn is_empty(&self) -> bool {
+        match self {
+            Response::Single(opt) => opt.is_none(),
+            Response::Batch(responses) => responses.is_empty(),
+        }
+    }
+}
 /// Message ID, which according to the MCP spec must be either a number or a string.
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Hash, Valuable)]
 #[serde(untagged)]
@@ -42,8 +141,38 @@ pub enum RequestId {
 
 impl RequestId {
     #[inline]
+    pub const fn null() -> Self {
+        RequestId::Null
+    }
+
+    #[inline]
     pub const fn is_null(&self) -> bool {
         matches!(self, RequestId::Null)
+    }
+}
+
+/// Protocol version
+#[derive(Debug, PartialEq, Clone, Copy, Hash, Eq, Serialize, Deserialize)]
+#[serde(try_from = "String", into = "String")]
+pub enum JsonRpcVersion {
+    V2,
+}
+
+impl TryFrom<String> for JsonRpcVersion {
+    type Error = serde::de::value::Error;
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        match value.as_str() {
+            "2.0" => Ok(JsonRpcVersion::V2),
+            _ => Err(serde::de::Error::custom("not a valid JSON-RPC 2.0 message")),
+        }
+    }
+}
+
+impl From<JsonRpcVersion> for String {
+    fn from(version: JsonRpcVersion) -> Self {
+        match version {
+            JsonRpcVersion::V2 => "2.0".to_string(),
+        }
     }
 }
 
@@ -74,7 +203,7 @@ impl TryFrom<serde_json::Value> for Params {
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct JsonRpcRequest {
-    jsonrpc: String,
+    jsonrpc: JsonRpcVersion,
     /// JSON-RPC spec: if `id` is ommitted, the request is assumed to be a notification.
     /// JSON-RPC permits this to be a "null" value, but MCP spec does not.
     pub id: RequestId,
@@ -86,7 +215,7 @@ pub struct JsonRpcRequest {
 impl JsonRpcRequest {
     pub fn new(id: RequestId, method: String, params: Option<Params>) -> Self {
         Self {
-            jsonrpc: JSONRPC_VERSION.to_owned(),
+            jsonrpc: JsonRpcVersion::V2,
             id,
             method,
             params,
@@ -96,7 +225,7 @@ impl JsonRpcRequest {
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct JsonRpcNotification {
-    jsonrpc: String,
+    jsonrpc: JsonRpcVersion,
     pub method: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub params: Option<Params>,
@@ -105,7 +234,7 @@ pub struct JsonRpcNotification {
 impl JsonRpcNotification {
     pub fn new(method: String, params: Option<Params>) -> Self {
         Self {
-            jsonrpc: JSONRPC_VERSION.to_owned(),
+            jsonrpc: JsonRpcVersion::V2,
             method,
             params,
         }
@@ -116,12 +245,12 @@ impl JsonRpcNotification {
 #[serde(untagged)]
 pub enum JsonRpcResponse {
     Success {
-        jsonrpc: String,
+        jsonrpc: JsonRpcVersion,
         id: RequestId,
         result: Value,
     },
     Error {
-        jsonrpc: String,
+        jsonrpc: JsonRpcVersion,
         id: RequestId,
         error: ErrorData,
     },
@@ -130,7 +259,7 @@ pub enum JsonRpcResponse {
 impl JsonRpcResponse {
     pub fn success(id: RequestId, result: Value) -> Self {
         Self::Success {
-            jsonrpc: JSONRPC_VERSION.to_owned(),
+            jsonrpc: JsonRpcVersion::V2,
             id,
             result,
         }
@@ -138,7 +267,7 @@ impl JsonRpcResponse {
 
     pub fn error(id: RequestId, error: ErrorData) -> Self {
         Self::Error {
-            jsonrpc: JSONRPC_VERSION.to_owned(),
+            jsonrpc: JsonRpcVersion::V2,
             id,
             error,
         }
@@ -461,6 +590,109 @@ mod tests {
                     data: None,
                 }
             )
+        );
+    }
+
+    #[test]
+    fn jsonrpc_version_error() {
+        // v1.0
+        let request = r#"{"jsonrpc":"1.0","id":1,"method":"test"}"#;
+        let deserialised = serde_json::from_str::<JsonRpcRequest>(request);
+        assert!(deserialised.is_err());
+        assert_eq!(
+            deserialised.err().unwrap().to_string(),
+            "not a valid JSON-RPC 2.0 message at line 1 column 16"
+        );
+
+        // no version
+        let request = r#"{"id":1,"method":"test"}"#;
+        let deserialised = serde_json::from_str::<JsonRpcRequest>(request);
+        assert!(deserialised.is_err());
+        assert_eq!(
+            deserialised.err().unwrap().to_string(),
+            "missing field `jsonrpc` at line 1 column 24"
+        );
+    }
+
+    #[test]
+    fn request_batch_deserialisation() {
+        // all ok
+        let request = r#"[{"jsonrpc":"2.0","id":1,"method":"tools/calc/add","params":[1,2,3]}, {"jsonrpc":"2.0","id":2,"method":"tools/list"}, {"jsonrpc": "2.0", "method": "notify_sum", "params": [1,2,4]}]"#;
+        let deserialised = serde_json::from_str::<Request>(request);
+        assert!(deserialised.is_ok());
+        let request = deserialised.unwrap();
+
+        match request {
+            Request::Batch(messages) => {
+                assert_eq!(messages.len(), 3);
+                assert!(matches!(messages[0], SendableMessage::Request(_)));
+                assert!(matches!(messages[1], SendableMessage::Request(_)));
+                assert!(matches!(messages[2], SendableMessage::Notification(_)));
+            }
+            _ => panic!("expected a batch"),
+        }
+    }
+
+    #[test]
+    fn request_batch_deserialisation_with_errors() {
+        // all invalid
+        let request = r#"[1]"#;
+        let deserialised = serde_json::from_str::<Request>(request);
+        assert!(deserialised.is_ok());
+        let request = deserialised.unwrap();
+
+        match request {
+            Request::Batch(messages) => {
+                assert_eq!(messages.len(), 1);
+                assert!(matches!(
+                    messages[0],
+                    SendableMessage::Invalid {
+                        id: RequestId::Null
+                    }
+                ));
+            }
+            _ => panic!("expected a batch"),
+        }
+
+        // one valid, two invalid
+        let request = r#"[{"jsonrpc":"2.0","id":1,"method":"test"}, {"jsonrpc":"1.0","id":1,"method":"test"}, {"foo":"bar"}]"#;
+        let deserialised = serde_json::from_str::<Request>(request);
+        assert!(deserialised.is_ok());
+        let request = deserialised.unwrap();
+
+        match request {
+            Request::Batch(messages) => {
+                assert_eq!(messages.len(), 3);
+                assert!(matches!(messages[0], SendableMessage::Request(_)));
+                assert!(matches!(
+                    messages[1],
+                    SendableMessage::Invalid {
+                        id: RequestId::Num(1),
+                        ..
+                    }
+                ));
+                assert!(matches!(
+                    messages[2],
+                    SendableMessage::Invalid {
+                        id: RequestId::Null,
+                        ..
+                    }
+                ));
+            }
+            _ => panic!("expected a batch"),
+        }
+    }
+
+    #[test]
+    fn response_serialisation() {
+        let response = Response::Single(Some(JsonRpcResponse::success(
+            RequestId::Num(1),
+            json!({ "key": "value" }),
+        )));
+        let serialized = serde_json::to_string(&response).unwrap();
+        assert_eq!(
+            serialized,
+            r#"{"jsonrpc":"2.0","id":1,"result":{"key":"value"}}"#
         );
     }
 }

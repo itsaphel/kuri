@@ -2,7 +2,7 @@
 mod common;
 
 use common::init_tool_server_simple;
-use kuri::serve;
+use kuri::{serve, ServiceExt};
 use std::{
     io,
     pin::Pin,
@@ -37,20 +37,9 @@ async fn test_invalid_request() {
     let response = request(r#"{}"#).await;
     assert_json_eq!(
         &response,
-        r#"{"jsonrpc": "2.0", "error": {"code": -32600, "message": "Message is not a JSON-RPC 2.0 message"}, "id": null}"#
+        r#"{"jsonrpc": "2.0", "error": {"code": -32600, "message": "Invalid request"}, "id": null}"#
     );
 
-    let response = request(r#"[]"#).await;
-    assert_json_eq!(
-        &response,
-        r#"{"jsonrpc": "2.0", "error": {"code": -32600, "message": "Message is not a JSON-RPC 2.0 message"}, "id": null}"#
-    );
-}
-
-// This test is disabled because we don't currently handle this case correctly (we return a parse error)
-#[tokio::test]
-#[ignore]
-async fn test_invalid_request_untagged() {
     let response = request(r#"{"jsonrpc": "2.0", "method": 1, "params": "bar"}"#).await;
     assert_json_eq!(
         &response,
@@ -90,17 +79,55 @@ async fn test_logical_param_errors() {
 
 #[tokio::test]
 async fn test_incorrect_jsonrpc_version() {
+    // JSON-RPC v1.0
     let response =
         request(r#"{"jsonrpc": "1.0", "method": "initialize", "params": {}, "id": 1}"#).await;
     assert_json_eq!(
         &response,
-        r#"{"jsonrpc": "2.0", "error": {"code": -32600, "message": "Message is not a JSON-RPC 2.0 message"}, "id": null}"#
+        r#"{"jsonrpc": "2.0", "error": {"code": -32600, "message": "Invalid request"}, "id": 1}"#
     );
 
+    // missing JSON-RPC version
     let response = request(r#"{"method": "initialize", "params": {}, "id": 1}"#).await;
     assert_json_eq!(
         &response,
-        r#"{"jsonrpc": "2.0", "error": {"code": -32600, "message": "Message is not a JSON-RPC 2.0 message"}, "id": null}"#
+        r#"{"jsonrpc": "2.0", "error": {"code": -32600, "message": "Invalid request"}, "id": 1}"#
+    );
+}
+
+#[tokio::test]
+async fn test_batch_no_valid_messages() {
+    // Empty array
+    let response = request(r#"[]"#).await;
+    assert_json_eq!(
+        &response,
+        r#"{"jsonrpc": "2.0", "error": {"code": -32600, "message": "Invalid request: batch is empty"}, "id": null}"#
+    );
+
+    // Non-empty batch (one message), but no valid message
+    let response = request(r#"[1]"#).await;
+    assert_json_eq!(
+        &response,
+        r#"[{"jsonrpc": "2.0", "error": {"code": -32600, "message": "Invalid request"}, "id": null}]"#
+    );
+
+    // Non-empty batch (multiple messages), but no valid message
+    let response = request(r#"[1,2]"#).await;
+    assert_json_eq!(
+        &response,
+        r#"[{"jsonrpc": "2.0", "error": {"code": -32600, "message": "Invalid request"}, "id": null},{"jsonrpc": "2.0", "error": {"code": -32600, "message": "Invalid request"}, "id": null}]"#
+    );
+}
+
+#[tokio::test]
+async fn test_batch_invalid_json() {
+    let response = request(
+        r#"[{"jsonrpc": "2.0", "method": "sum", "params": [1,2,4], "id": "1"},{"jsonrpc": "2.0", "method"]"#,
+    )
+    .await;
+    assert_json_eq!(
+        &response,
+        r#"{"jsonrpc": "2.0", "error": {"code": -32700, "message": "JSON parsing error when deserialising the message"}, "id": null}"#
     );
 }
 
@@ -175,7 +202,7 @@ async fn request(input: &str) -> String {
     let mut transport = MockTransport::new();
     transport.set_read_buf(format!("{}\n", input).as_bytes());
 
-    let _ = serve(service, transport.clone()).await;
+    let _ = serve(service.into_request_service(), transport.clone()).await;
 
     let response = transport.get_write_buf();
     let response_str = std::str::from_utf8(&response).unwrap();

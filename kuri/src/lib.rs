@@ -20,7 +20,7 @@
 //!         .with_tool(HelloWorldTool)
 //!         .build();
 //!
-//!     serve(service, StdioTransport::new()).await
+//!     serve(service.into_request_service(), StdioTransport::new()).await
 //! }
 //! ```
 //!
@@ -98,6 +98,19 @@
 //! For now, you will need to add the code to your handler to invoke your middleware. We're still
 //! working on making this more ergonomic within kuri.
 //!
+//! ## `.into_request_service()`
+//!
+//! [`MCPService`] is a service that processes a single JSON-RPC message (represented by [`SendableMessage`]).
+//! However, a JSON-RPC request (represented by [`Request`]) may contain a batch of messages as well.
+//! [`MCPRequestService`] is a tower service that processes these JSON-RPC requests. On the transport,
+//! you'll want to serve a service that handles the JSON-RPC requests. To turn an [`MCPService`] into a
+//! [`MCPRequestService`], you can use the `.into_request_service()` method.
+//!
+//! This has a few implications for middleware. For tracing for instance, you may want this to apply
+//! at the request level. In that case, you can use `.into_request_service()` on the service before
+//! applying your tracing middleware. Other middleware may prefer to be applied at the message level,
+//! and can be applied on [`MCPServer`] instead.
+//!
 //! # Sharing state with handlers
 //!
 //! Handlers can share state with each other, and persist state across invocations, through types
@@ -134,7 +147,7 @@
 //!
 //! let service = MCPServiceBuilder::new(...).build();
 //!
-//! serve(service, StdioTransport::new()).await?;
+//! serve(service.into_request_service(), StdioTransport::new()).await?;
 //! ```
 //!
 //! # Logging
@@ -172,12 +185,14 @@ pub mod middleware;
 pub mod response;
 mod serve;
 mod service;
+mod service_ext;
 pub mod transport;
 
 // aliases
 pub use handler::{PromptHandler, ToolHandler};
 pub use serve::serve;
-pub use service::{MCPService, MCPServiceBuilder};
+pub use service::{MCPRequestService, MCPService, MCPServiceBuilder};
+pub use service_ext::ServiceExt;
 
 // re-export certain MCP protocol types
 pub use kuri_mcp_protocol::{

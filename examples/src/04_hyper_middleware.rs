@@ -1,6 +1,6 @@
 use anyhow::Result;
 use kuri::{
-    MCPServiceBuilder, ToolError, middleware::tracing::TracingLayer, serve, tool,
+    MCPServiceBuilder, ServiceExt, ToolError, middleware::tracing::TracingLayer, serve, tool,
     transport::StdioTransport,
 };
 use tower::ServiceBuilder;
@@ -70,7 +70,7 @@ async fn main() -> Result<()> {
         .service(service);
 
     // Serve over the stdio transport
-    serve(final_service, StdioTransport::new()).await?;
+    serve(final_service.into_request_service(), StdioTransport::new()).await?;
 
     Ok(())
 }

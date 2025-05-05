@@ -3,8 +3,12 @@ use crate::{
     errors::RequestError,
     handler::{PromptHandler, ToolHandler},
 };
+use futures::future::LocalBoxFuture;
 use kuri_mcp_protocol::{
-    jsonrpc::{ErrorData, JsonRpcRequest, JsonRpcResponse, Params, SendableMessage},
+    jsonrpc::{
+        ErrorCode, ErrorData, JsonRpcRequest, JsonRpcResponse, Params, Request, RequestId,
+        Response, SendableMessage,
+    },
     messages::{
         CallToolResult, GetPromptResult, Implementation, InitializeResult, ListPromptsResult,
         ListResourcesResult, ListToolsResult, PromptsCapability, ReadResourceResult,
@@ -506,7 +510,7 @@ impl MCPService {
 impl Service<SendableMessage> for MCPService {
     type Response = Option<JsonRpcResponse>;
     type Error = Infallible;
-    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>;
+    type Future = LocalBoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     fn poll_ready(&mut self, _cx: &mut std::task::Context<'_>) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
@@ -518,30 +522,110 @@ impl Service<SendableMessage> for MCPService {
     fn call(&mut self, req: SendableMessage) -> Self::Future {
         let this = self.clone();
         Box::pin(async move {
-            if let SendableMessage::Request(req) = req {
-                let id = req.id.clone();
-                let result = match req.method.as_str() {
-                    "ping" => this.handle_ping(req).await,
-                    "initialize" => this.handle_initialize(req).await,
-                    "tools/list" => this.handle_tools_list(req).await,
-                    "tools/call" => this.handle_tools_call(req).await,
-                    "resources/list" => this.handle_resources_list(req).await,
-                    "resources/read" => this.handle_resources_read(req).await,
-                    "prompts/list" => this.handle_prompts_list(req).await,
-                    "prompts/get" => this.handle_prompts_get(req).await,
-                    _ => Err(RequestError::MethodNotFound(req.method)),
-                };
+            match req {
+                SendableMessage::Request(req) => {
+                    let id = req.id.clone();
+                    let result = match req.method.as_str() {
+                        "ping" => this.handle_ping(req).await,
+                        "initialize" => this.handle_initialize(req).await,
+                        "tools/list" => this.handle_tools_list(req).await,
+                        "tools/call" => this.handle_tools_call(req).await,
+                        "resources/list" => this.handle_resources_list(req).await,
+                        "resources/read" => this.handle_resources_read(req).await,
+                        "prompts/list" => this.handle_prompts_list(req).await,
+                        "prompts/get" => this.handle_prompts_get(req).await,
+                        _ => Err(RequestError::MethodNotFound(req.method)),
+                    };
 
-                let response = match result {
-                    Ok(response) => response,
-                    Err(e) => {
-                        let error = ErrorData::from(e);
-                        JsonRpcResponse::error(id, error)
+                    let response = match result {
+                        Ok(response) => response,
+                        Err(e) => {
+                            let error = ErrorData::from(e);
+                            JsonRpcResponse::error(id, error)
+                        }
+                    };
+                    Ok(Some(response))
+                }
+                // TODO: Handle notifications.
+                SendableMessage::Notification(_) => Ok(None),
+                SendableMessage::Invalid { id } => {
+                    let error =
+                        ErrorData::new(ErrorCode::InvalidRequest, "Invalid request".to_string());
+                    let response = JsonRpcResponse::error(id, error);
+                    Ok(Some(response))
+                }
+            }
+        })
+    }
+}
+
+/// `MCPRequestService` takes a `Request`, which may be a batch or single message of method calls
+/// or notifications, and returns a `Response`, which is a batch of responses or a single (optional)
+/// response.
+///
+/// It wraps a `Service<SendableMessage>`, which processes a single message.
+#[derive(Clone)]
+pub struct MCPRequestService<S> {
+    /// Service that processes a single message.
+    inner: S,
+}
+
+impl<S> MCPRequestService<S>
+where
+    S: Service<SendableMessage, Response = Option<JsonRpcResponse>, Error = Infallible>
+        + Clone
+        + 'static,
+{
+    pub fn new(inner: S) -> Self {
+        Self { inner }
+    }
+}
+
+impl<S> Service<Request> for MCPRequestService<S>
+where
+    S: Service<SendableMessage, Response = Option<JsonRpcResponse>, Error = Infallible>
+        + Clone
+        + 'static,
+{
+    type Response = Response;
+    type Error = Infallible;
+    type Future = LocalBoxFuture<'static, Result<Self::Response, Self::Error>>;
+
+    fn poll_ready(&mut self, _cx: &mut std::task::Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
+    }
+
+    fn call(&mut self, req: Request) -> Self::Future {
+        let mut service = self.inner.clone();
+        Box::pin(async move {
+            match req {
+                Request::Single(msg) => {
+                    let resp = service.call(msg).await?;
+                    Ok(Response::Single(resp))
+                }
+                Request::Batch(msgs) => {
+                    // Special case: batch is empty
+                    if msgs.is_empty() {
+                        let error = ErrorData::new(
+                            ErrorCode::InvalidRequest,
+                            "Invalid request: batch is empty".to_string(),
+                        );
+                        let response = JsonRpcResponse::error(RequestId::null(), error);
+                        return Ok(Response::Single(Some(response)));
                     }
-                };
-                Ok(Some(response))
-            } else {
-                Ok(None)
+
+                    let futures = msgs.into_iter().map(|msg| service.call(msg));
+
+                    // a batch may be processed concurrently
+                    let responses = futures::future::join_all(futures)
+                        .await
+                        .into_iter()
+                        // service is infallible, so we can unwrap safely
+                        // also, exclude notification responses
+                        .filter_map(Result::unwrap)
+                        .collect();
+                    Ok(Response::Batch(responses))
+                }
             }
         })
     }

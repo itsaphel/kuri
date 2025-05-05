@@ -12,6 +12,7 @@ use tracing::Level;
 const DEFAULT_TRACE_LEVEL: Level = Level::DEBUG;
 
 /// A service that logs incoming MCP messages
+#[derive(Clone)]
 pub struct TracingService<S> {
     inner: S,
 }
@@ -30,13 +31,16 @@ where
     }
 
     fn call(&mut self, req: SendableMessage) -> Self::Future {
+        // TODO: Fix invalid case
         let method = match &req {
             SendableMessage::Request(req) => &req.method,
             SendableMessage::Notification(req) => &req.method,
+            SendableMessage::Invalid { .. } => unreachable!(),
         };
         let params = match &req {
             SendableMessage::Request(req) => &req.params,
             SendableMessage::Notification(req) => &req.params,
+            SendableMessage::Invalid { .. } => unreachable!(),
         };
         let span = tracing::span!(
             DEFAULT_TRACE_LEVEL,
