@@ -5,18 +5,18 @@
 //!
 //! The "Hello World" of kuri is:
 //!
-//! ```rust,ignore
-//! use kuri::{MCPServiceBuilder, serve};
-//! use kuri::transport::StdioTransport;
-//! use kuri::errors::ServerError;
+//! ```rust
+//! use kuri::{MCPServiceBuilder, serve, tool, ServiceExt};
+//! use kuri::transport::{StdioTransport, TransportError};
 //!
+//! #[tool]
 //! async fn hello_world_tool() -> String {
 //!     "Hello World".to_string()
 //! }
 //!
 //! #[tokio::main]
-//! async fn main() -> Result<(), ServerError> {
-//!     let service = MCPServiceBuilder::new("Hello World", "A server with a 'hello world' tool")
+//! async fn main() -> Result<(), TransportError> {
+//!     let service = MCPServiceBuilder::new("Hello World".to_string(), "A server with a 'hello world' tool".to_string())
 //!         .with_tool(HelloWorldTool)
 //!         .build();
 //!
@@ -49,6 +49,29 @@
 //! [`IntoCallToolResult`]. Since handlers are just Rust functions, you can use them as normal.
 //! Testing is also straightforward; just call the function directly.
 //!
+//! # Handling notifications
+//!
+//! To handle notifications, you'll need to define your own function to handle [`Notification`] and
+//! provide this to the [`MCPServiceBuilder`] when building your service.
+//!
+//! ```rust
+//! use kuri::{MCPServiceBuilder};
+//! use kuri_mcp_protocol::jsonrpc::Notification;
+//!
+//! async fn my_notification_handler(notification: Notification) {
+//!     println!("Notification received: {:?}", notification.method);
+//! }
+//!
+//! let mut service = MCPServiceBuilder::new(
+//!     "Notification server".to_string(),
+//!     "Test notification server".to_string(),
+//! )
+//!     .with_notification_handler(move |_, notification| {
+//!         Box::pin(my_notification_handler(notification))
+//!     })
+//!     .build();
+//! ```
+//!
 //! ## Error handling
 //!
 //! The MCP protocol supports two types of errors: RPC errors, and logical errors. In tool handlers,
@@ -69,17 +92,18 @@
 //!
 //! If your middleware needs to run on all invocations, you can apply the `.layer` using tower's
 //! [`ServiceBuilder`]:
-//! ```rust,ignore
+//! ```rust
 //! use kuri::{MCPServiceBuilder, middleware::tracing::TracingLayer};
 //! use tower::ServiceBuilder;
+//! # use kuri::tool;
+//! # #[tool]
+//! # async fn hello_world_tool() -> String {
+//! #     "Hello World".to_string()
+//! # }
 //!
-//! let service = MCPServiceBuilder::new(
-//!     "Calculator".to_string(),
-//!     "This server provides a `calculator` tool that can perform basic arithmetic operations."
-//!         .to_string(),
-//! )
-//! .with_tool(Calculator)
-//! .build();
+//! let service = MCPServiceBuilder::new("Hello World".to_string(), "A server with a 'hello world' tool".to_string())
+//!     .with_tool(HelloWorldTool)
+//!     .build();
 //!
 //! let final_service = ServiceBuilder::new()
 //!     // Add tracing middleware
@@ -120,14 +144,21 @@
 //! ```rust,ignore
 //! let my_state = Counter::default();
 //! let service = MCPServiceBuilder::new(...)
-//! .with_state(Inject::new(my_state))
-//! .build();
+//!     .with_state(Inject::new(my_state))
+//!     .build();
 //! ```
 //!
 //! You can then access the state within your handlers using by wrapping your type in `Inject`:
 //!
-//! ```rust,ignore
-//! async fn increment(counter: Inject<Counter>, quantity: u32) -> () {
+//! ```rust
+//! # use kuri::context::Inject;
+//! # use std::sync::atomic::{AtomicI32, Ordering};
+//! # use std::sync::Arc;
+//! # struct Counter {
+//! #     inner: Arc<AtomicI32>,
+//! # }
+//!
+//! async fn increment(counter: Inject<Counter>, quantity: u32) {
 //!     counter.inner.fetch_add(quantity as i32, Ordering::SeqCst);
 //! }
 //! ```
@@ -138,17 +169,7 @@
 //! # Transports
 //!
 //! Once you instantiate a [`MCPService`], you can use the [`serve`] function to start the server
-//! over some transport:
-//!
-//! ```rust,ignore
-//! use kuri::serve;
-//! use kuri::transport::StdioTransport;
-//! use kuri::MCPService;
-//!
-//! let service = MCPServiceBuilder::new(...).build();
-//!
-//! serve(service.into_request_service(), StdioTransport::new()).await?;
-//! ```
+//! over some transport, as in the Hello World example above.
 //!
 //! # Logging
 //!

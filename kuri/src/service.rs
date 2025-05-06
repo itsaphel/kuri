@@ -6,8 +6,8 @@ use crate::{
 use futures::future::LocalBoxFuture;
 use kuri_mcp_protocol::{
     jsonrpc::{
-        ErrorCode, ErrorData, MethodCall, Params, Request, RequestId, Response, ResponseItem,
-        SendableMessage,
+        ErrorCode, ErrorData, MethodCall, Notification, Params, Request, RequestId, Response,
+        ResponseItem, SendableMessage,
     },
     messages::{
         CallToolResult, GetPromptResult, Implementation, InitializeResult, ListPromptsResult,
@@ -27,6 +27,7 @@ use tower::Service;
 
 type Tools = HashMap<String, Rc<dyn ToolHandler>>;
 type Prompts = HashMap<String, Rc<dyn PromptHandler>>;
+type NotificationHandler = Rc<dyn Fn(&Context, Notification) -> LocalBoxFuture<'static, ()>>;
 
 /// A service that handles MCP requests.
 ///
@@ -42,6 +43,9 @@ pub struct MCPService {
     tools: Rc<Tools>,
     prompts: Rc<Prompts>,
     ctx: Rc<Context>,
+
+    // raw message handlers
+    notification_handler: Option<NotificationHandler>,
 }
 
 /// Build an MCPService. Tools and structs are defined when the MCPService is built. They cannot be
@@ -52,6 +56,9 @@ pub struct MCPServiceBuilder {
     tools: Tools,
     prompts: Prompts,
     ctx: Context,
+
+    // raw message handlers
+    notification_handler: Option<NotificationHandler>,
 }
 
 impl MCPServiceBuilder {
@@ -62,6 +69,7 @@ impl MCPServiceBuilder {
             tools: HashMap::new(),
             prompts: HashMap::new(),
             ctx: Context::default(),
+            notification_handler: None,
         }
     }
 
@@ -81,6 +89,14 @@ impl MCPServiceBuilder {
         self
     }
 
+    pub fn with_notification_handler(
+        mut self,
+        handler: impl Fn(&Context, Notification) -> LocalBoxFuture<'static, ()> + 'static,
+    ) -> Self {
+        self.notification_handler = Some(Rc::new(handler));
+        self
+    }
+
     pub fn build(self) -> MCPService {
         MCPService {
             name: self.name,
@@ -88,6 +104,7 @@ impl MCPServiceBuilder {
             tools: Rc::new(self.tools),
             prompts: Rc::new(self.prompts),
             ctx: Rc::new(self.ctx),
+            notification_handler: self.notification_handler,
         }
     }
 }
@@ -546,8 +563,12 @@ impl Service<SendableMessage> for MCPService {
                     };
                     Ok(Some(response))
                 }
-                // TODO: Handle notifications.
-                SendableMessage::Notification(_) => Ok(None),
+                SendableMessage::Notification(notification) => {
+                    if let Some(handler) = this.notification_handler {
+                        handler(&this.ctx, notification).await;
+                    }
+                    Ok(None)
+                }
                 SendableMessage::Invalid { id } => {
                     let error =
                         ErrorData::new(ErrorCode::InvalidRequest, "Invalid request".to_string());
@@ -629,4 +650,42 @@ where
             }
         })
     }
+}
+
+// most functionality is tested as integration tests, in `tests/`
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::cell::RefCell;
+
+    #[tokio::test]
+    async fn test_notification_handler() {
+        let called = Rc::new(RefCell::new(false));
+        let called_clone = called.clone();
+
+        let mut server = MCPServiceBuilder::new(
+            "Notification server".to_string(),
+            "Test notification server".to_string(),
+        )
+        .with_notification_handler(move |_, notification| {
+            let called = called_clone.clone();
+            Box::pin(async move {
+                if notification.method == "my_notification" {
+                    *called.borrow_mut() = true;
+                }
+            })
+        })
+        .build();
+
+        // When
+        let _ = server
+            .call(Notification::new("my_notification".to_string(), None).into())
+            .await;
+
+        // Then
+        assert!(*called.borrow());
+    }
+
+    #[tokio::test]
+    async fn test_notification_handler_2() {}
 }
