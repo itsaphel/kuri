@@ -11,8 +11,8 @@ use valuable::Valuable;
 #[derive(Debug, Serialize, Clone, PartialEq)]
 #[serde(untagged)]
 pub enum SendableMessage {
-    Request(JsonRpcRequest),
-    Notification(JsonRpcNotification),
+    Request(MethodCall),
+    Notification(Notification),
     Invalid {
         /// call ID (if known)
         #[serde(default = "RequestId::null")]
@@ -20,14 +20,14 @@ pub enum SendableMessage {
     },
 }
 
-impl From<JsonRpcRequest> for SendableMessage {
-    fn from(request: JsonRpcRequest) -> Self {
+impl From<MethodCall> for SendableMessage {
+    fn from(request: MethodCall) -> Self {
         SendableMessage::Request(request)
     }
 }
 
-impl From<JsonRpcNotification> for SendableMessage {
-    fn from(notification: JsonRpcNotification) -> Self {
+impl From<Notification> for SendableMessage {
+    fn from(notification: Notification) -> Self {
         SendableMessage::Notification(notification)
     }
 }
@@ -116,9 +116,9 @@ impl<'de> serde::Deserialize<'de> for Request {
 #[serde(untagged)]
 pub enum Response {
     /// Single message
-    Single(Option<JsonRpcResponse>),
+    Single(Option<ResponseItem>),
     /// Batch of messages
-    Batch(Vec<JsonRpcResponse>),
+    Batch(Vec<ResponseItem>),
 }
 
 impl Response {
@@ -201,8 +201,9 @@ impl TryFrom<serde_json::Value> for Params {
     }
 }
 
+/// An RPC method call (known in the JSON-RPC spec as a "request").
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-pub struct JsonRpcRequest {
+pub struct MethodCall {
     jsonrpc: JsonRpcVersion,
     /// JSON-RPC spec: if `id` is ommitted, the request is assumed to be a notification.
     /// JSON-RPC permits this to be a "null" value, but MCP spec does not.
@@ -212,7 +213,7 @@ pub struct JsonRpcRequest {
     pub params: Option<Params>,
 }
 
-impl JsonRpcRequest {
+impl MethodCall {
     pub fn new(id: RequestId, method: String, params: Option<Params>) -> Self {
         Self {
             jsonrpc: JsonRpcVersion::V2,
@@ -224,14 +225,14 @@ impl JsonRpcRequest {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-pub struct JsonRpcNotification {
+pub struct Notification {
     jsonrpc: JsonRpcVersion,
     pub method: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub params: Option<Params>,
 }
 
-impl JsonRpcNotification {
+impl Notification {
     pub fn new(method: String, params: Option<Params>) -> Self {
         Self {
             jsonrpc: JsonRpcVersion::V2,
@@ -243,7 +244,7 @@ impl JsonRpcNotification {
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 #[serde(untagged)]
-pub enum JsonRpcResponse {
+pub enum ResponseItem {
     Success {
         jsonrpc: JsonRpcVersion,
         id: RequestId,
@@ -256,7 +257,7 @@ pub enum JsonRpcResponse {
     },
 }
 
-impl JsonRpcResponse {
+impl ResponseItem {
     pub fn success(id: RequestId, result: Value) -> Self {
         Self::Success {
             jsonrpc: JsonRpcVersion::V2,
@@ -422,12 +423,12 @@ mod tests {
     #[test]
     fn request_serialization() {
         // without params
-        let request = JsonRpcRequest::new(RequestId::Num(1), "test".to_string(), None);
+        let request = MethodCall::new(RequestId::Num(1), "test".to_string(), None);
         let serialized = serde_json::to_string(&request).unwrap();
         assert_eq!(serialized, r#"{"jsonrpc":"2.0","id":1,"method":"test"}"#);
 
         // with array params
-        let request = JsonRpcRequest::new(
+        let request = MethodCall::new(
             RequestId::Num(1),
             "test".to_string(),
             Some(Params::try_from(serde_json::json!([1, 2, 3])).unwrap()),
@@ -439,7 +440,7 @@ mod tests {
         );
 
         // with map params
-        let request = JsonRpcRequest::new(
+        let request = MethodCall::new(
             RequestId::Num(1),
             "test".to_string(),
             Some(
@@ -452,7 +453,7 @@ mod tests {
             r#"{"jsonrpc":"2.0","id":1,"method":"test","params":{"key":"value","key2":"value2"}}"#
         );
 
-        let request = JsonRpcRequest::new(RequestId::Null, "test".to_string(), None);
+        let request = MethodCall::new(RequestId::Null, "test".to_string(), None);
         let serialized = serde_json::to_string(&request).unwrap();
         assert_eq!(serialized, r#"{"jsonrpc":"2.0","id":null,"method":"test"}"#);
     }
@@ -461,18 +462,18 @@ mod tests {
     fn request_deserialization() {
         // without params
         let request = r#"{"jsonrpc":"2.0","id":1,"method":"test"}"#;
-        let deserialized: JsonRpcRequest = serde_json::from_str(request).unwrap();
+        let deserialized: MethodCall = serde_json::from_str(request).unwrap();
         assert_eq!(
             deserialized,
-            JsonRpcRequest::new(RequestId::Num(1), "test".to_string(), None)
+            MethodCall::new(RequestId::Num(1), "test".to_string(), None)
         );
 
         // with array params
         let request = r#"{"jsonrpc":"2.0","id":1,"method":"test","params":[1,2,3]}"#;
-        let deserialized: JsonRpcRequest = serde_json::from_str(request).unwrap();
+        let deserialized: MethodCall = serde_json::from_str(request).unwrap();
         assert_eq!(
             deserialized,
-            JsonRpcRequest::new(
+            MethodCall::new(
                 RequestId::Num(1),
                 "test".to_string(),
                 Some(Params::try_from(serde_json::json!([1, 2, 3])).unwrap())
@@ -481,10 +482,10 @@ mod tests {
 
         // with params
         let request = r#"{"jsonrpc":"2.0","id":1,"method":"test","params":{"key":"value"}}"#;
-        let deserialized: JsonRpcRequest = serde_json::from_str(request).unwrap();
+        let deserialized: MethodCall = serde_json::from_str(request).unwrap();
         assert_eq!(
             deserialized,
-            JsonRpcRequest::new(
+            MethodCall::new(
                 RequestId::Num(1),
                 "test".to_string(),
                 Some(Params::try_from(serde_json::json!({ "key": "value" })).unwrap())
@@ -495,12 +496,12 @@ mod tests {
     #[test]
     fn notification_serialization() {
         // without params
-        let notification = JsonRpcNotification::new("test".to_string(), None);
+        let notification = Notification::new("test".to_string(), None);
         let serialized = serde_json::to_string(&notification).unwrap();
         assert_eq!(serialized, r#"{"jsonrpc":"2.0","method":"test"}"#);
 
         // with params
-        let notification = JsonRpcNotification::new(
+        let notification = Notification::new(
             "test".to_string(),
             Some(Params::Map(serde_json::Map::from_iter([(
                 "key".to_string(),
@@ -518,18 +519,15 @@ mod tests {
     fn notification_deserialization() {
         // without params
         let notification = r#"{"jsonrpc":"2.0","method":"test"}"#;
-        let deserialized: JsonRpcNotification = serde_json::from_str(notification).unwrap();
-        assert_eq!(
-            deserialized,
-            JsonRpcNotification::new("test".to_string(), None)
-        );
+        let deserialized: Notification = serde_json::from_str(notification).unwrap();
+        assert_eq!(deserialized, Notification::new("test".to_string(), None));
 
         // with params
         let notification = r#"{"jsonrpc":"2.0","method":"test","params":{"key":"value"}}"#;
-        let deserialized: JsonRpcNotification = serde_json::from_str(notification).unwrap();
+        let deserialized: Notification = serde_json::from_str(notification).unwrap();
         assert_eq!(
             deserialized,
-            JsonRpcNotification::new(
+            Notification::new(
                 "test".to_string(),
                 Some(Params::Map(serde_json::Map::from_iter([(
                     "key".to_string(),
@@ -541,7 +539,7 @@ mod tests {
 
     #[test]
     fn response_serialization() {
-        let response = JsonRpcResponse::success(RequestId::Num(1), json!({ "key": "value" }));
+        let response = ResponseItem::success(RequestId::Num(1), json!({ "key": "value" }));
         let serialized = serde_json::to_string(&response).unwrap();
         assert_eq!(
             serialized,
@@ -552,16 +550,16 @@ mod tests {
     #[test]
     fn response_deserialization() {
         let response = r#"{"jsonrpc":"2.0","id":1,"result":{"key":"value"}}"#;
-        let deserialized: JsonRpcResponse = serde_json::from_str(response).unwrap();
+        let deserialized: ResponseItem = serde_json::from_str(response).unwrap();
         assert_eq!(
             deserialized,
-            JsonRpcResponse::success(RequestId::Num(1), json!({ "key": "value" }))
+            ResponseItem::success(RequestId::Num(1), json!({ "key": "value" }))
         );
     }
 
     #[test]
     fn error_serialization() {
-        let error = JsonRpcResponse::error(
+        let error = ResponseItem::error(
             RequestId::Num(42),
             ErrorData {
                 code: ErrorCode::ParseError,
@@ -579,10 +577,10 @@ mod tests {
     #[test]
     fn error_deserialization() {
         let error = r#"{"jsonrpc":"2.0","id":42,"error":{"code":-32700,"message":"Parse error"}}"#;
-        let deserialized: JsonRpcResponse = serde_json::from_str(error).unwrap();
+        let deserialized: ResponseItem = serde_json::from_str(error).unwrap();
         assert_eq!(
             deserialized,
-            JsonRpcResponse::error(
+            ResponseItem::error(
                 RequestId::Num(42),
                 ErrorData {
                     code: ErrorCode::ParseError,
@@ -597,7 +595,7 @@ mod tests {
     fn jsonrpc_version_error() {
         // v1.0
         let request = r#"{"jsonrpc":"1.0","id":1,"method":"test"}"#;
-        let deserialised = serde_json::from_str::<JsonRpcRequest>(request);
+        let deserialised = serde_json::from_str::<MethodCall>(request);
         assert!(deserialised.is_err());
         assert_eq!(
             deserialised.err().unwrap().to_string(),
@@ -606,7 +604,7 @@ mod tests {
 
         // no version
         let request = r#"{"id":1,"method":"test"}"#;
-        let deserialised = serde_json::from_str::<JsonRpcRequest>(request);
+        let deserialised = serde_json::from_str::<MethodCall>(request);
         assert!(deserialised.is_err());
         assert_eq!(
             deserialised.err().unwrap().to_string(),
@@ -685,7 +683,7 @@ mod tests {
 
     #[test]
     fn response_serialisation() {
-        let response = Response::Single(Some(JsonRpcResponse::success(
+        let response = Response::Single(Some(ResponseItem::success(
             RequestId::Num(1),
             json!({ "key": "value" }),
         )));

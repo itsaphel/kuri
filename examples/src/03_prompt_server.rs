@@ -1,5 +1,5 @@
 use anyhow::Result;
-use kuri::{prompt, serve, transport::StdioTransport, MCPServiceBuilder, ServiceExt};
+use kuri::{MCPServiceBuilder, ServiceExt, prompt, serve, transport::StdioTransport};
 use tracing_subscriber::{self, EnvFilter};
 
 #[prompt(

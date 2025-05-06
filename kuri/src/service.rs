@@ -6,8 +6,8 @@ use crate::{
 use futures::future::LocalBoxFuture;
 use kuri_mcp_protocol::{
     jsonrpc::{
-        ErrorCode, ErrorData, JsonRpcRequest, JsonRpcResponse, Params, Request, RequestId,
-        Response, SendableMessage,
+        ErrorCode, ErrorData, MethodCall, Params, Request, RequestId, Response, ResponseItem,
+        SendableMessage,
     },
     messages::{
         CallToolResult, GetPromptResult, Implementation, InitializeResult, ListPromptsResult,
@@ -309,15 +309,15 @@ fn get_request_params(
 impl MCPService {
     fn handle_ping(
         &self,
-        req: JsonRpcRequest,
-    ) -> impl Future<Output = Result<JsonRpcResponse, RequestError>> {
-        async move { Ok(JsonRpcResponse::success(req.id, json!({}))) }
+        req: MethodCall,
+    ) -> impl Future<Output = Result<ResponseItem, RequestError>> {
+        async move { Ok(ResponseItem::success(req.id, json!({}))) }
     }
 
     fn handle_initialize(
         &self,
-        req: JsonRpcRequest,
-    ) -> impl Future<Output = Result<JsonRpcResponse, RequestError>> + '_ {
+        req: MethodCall,
+    ) -> impl Future<Output = Result<ResponseItem, RequestError>> + '_ {
         async move {
             // Build response content
             let result = InitializeResult {
@@ -333,15 +333,15 @@ impl MCPService {
             // Serialise response
             let result = serde_json::to_value(result)
                 .map_err(|e| RequestError::Internal(format!("JSON serialization error: {}", e)))?;
-            let response = JsonRpcResponse::success(req.id, result);
+            let response = ResponseItem::success(req.id, result);
             Ok(response)
         }
     }
 
     fn handle_tools_list(
         &self,
-        req: JsonRpcRequest,
-    ) -> impl Future<Output = Result<JsonRpcResponse, RequestError>> + '_ {
+        req: MethodCall,
+    ) -> impl Future<Output = Result<ResponseItem, RequestError>> + '_ {
         async move {
             // No request arguments required.
 
@@ -352,15 +352,15 @@ impl MCPService {
             // Serialise response
             let result = serde_json::to_value(result)
                 .map_err(|e| RequestError::Internal(format!("JSON serialization error: {}", e)))?;
-            let response = JsonRpcResponse::success(req.id, result);
+            let response = ResponseItem::success(req.id, result);
             Ok(response)
         }
     }
 
     fn handle_tools_call(
         &self,
-        req: JsonRpcRequest,
-    ) -> impl Future<Output = Result<JsonRpcResponse, RequestError>> + '_ {
+        req: MethodCall,
+    ) -> impl Future<Output = Result<ResponseItem, RequestError>> + '_ {
         async move {
             // Get and validate request parameters
             let params = get_request_params(req.params)?;
@@ -378,15 +378,15 @@ impl MCPService {
             // Serialise response
             let result = serde_json::to_value(result)
                 .map_err(|e| RequestError::Internal(format!("JSON serialization error: {}", e)))?;
-            let response = JsonRpcResponse::success(req.id, result);
+            let response = ResponseItem::success(req.id, result);
             Ok(response)
         }
     }
 
     fn handle_resources_list(
         &self,
-        req: JsonRpcRequest,
-    ) -> impl Future<Output = Result<JsonRpcResponse, RequestError>> + '_ {
+        req: MethodCall,
+    ) -> impl Future<Output = Result<ResponseItem, RequestError>> + '_ {
         async move {
             // No request arguments required.
 
@@ -397,15 +397,15 @@ impl MCPService {
             // Serialise response
             let result = serde_json::to_value(result)
                 .map_err(|e| RequestError::Internal(format!("JSON serialization error: {}", e)))?;
-            let response = JsonRpcResponse::success(req.id, result);
+            let response = ResponseItem::success(req.id, result);
             Ok(response)
         }
     }
 
     fn handle_resources_read(
         &self,
-        req: JsonRpcRequest,
-    ) -> impl Future<Output = Result<JsonRpcResponse, RequestError>> + '_ {
+        req: MethodCall,
+    ) -> impl Future<Output = Result<ResponseItem, RequestError>> + '_ {
         async move {
             // Get and validate request parameters
             let params = get_request_params(req.params)?;
@@ -427,15 +427,15 @@ impl MCPService {
 
             let result = serde_json::to_value(result)
                 .map_err(|e| RequestError::Internal(format!("JSON serialization error: {}", e)))?;
-            let response = JsonRpcResponse::success(req.id, result);
+            let response = ResponseItem::success(req.id, result);
             Ok(response)
         }
     }
 
     fn handle_prompts_list(
         &self,
-        req: JsonRpcRequest,
-    ) -> impl Future<Output = Result<JsonRpcResponse, RequestError>> + '_ {
+        req: MethodCall,
+    ) -> impl Future<Output = Result<ResponseItem, RequestError>> + '_ {
         async move {
             // No request arguments required.
 
@@ -446,15 +446,15 @@ impl MCPService {
             // Serialise response
             let result = serde_json::to_value(result)
                 .map_err(|e| RequestError::Internal(format!("JSON serialization error: {}", e)))?;
-            let response = JsonRpcResponse::success(req.id, result);
+            let response = ResponseItem::success(req.id, result);
             Ok(response)
         }
     }
 
     fn handle_prompts_get(
         &self,
-        req: JsonRpcRequest,
-    ) -> impl Future<Output = Result<JsonRpcResponse, RequestError>> + '_ {
+        req: MethodCall,
+    ) -> impl Future<Output = Result<ResponseItem, RequestError>> + '_ {
         async move {
             // Get and validate request parameters
             let params = get_request_params(req.params)?;
@@ -501,14 +501,14 @@ impl MCPService {
                 messages,
             })
             .map_err(|e| RequestError::Internal(format!("JSON serialization error: {}", e)))?;
-            let response = JsonRpcResponse::success(req.id, result);
+            let response = ResponseItem::success(req.id, result);
             Ok(response)
         }
     }
 }
 
 impl Service<SendableMessage> for MCPService {
-    type Response = Option<JsonRpcResponse>;
+    type Response = Option<ResponseItem>;
     type Error = Infallible;
     type Future = LocalBoxFuture<'static, Result<Self::Response, Self::Error>>;
 
@@ -541,7 +541,7 @@ impl Service<SendableMessage> for MCPService {
                         Ok(response) => response,
                         Err(e) => {
                             let error = ErrorData::from(e);
-                            JsonRpcResponse::error(id, error)
+                            ResponseItem::error(id, error)
                         }
                     };
                     Ok(Some(response))
@@ -551,7 +551,7 @@ impl Service<SendableMessage> for MCPService {
                 SendableMessage::Invalid { id } => {
                     let error =
                         ErrorData::new(ErrorCode::InvalidRequest, "Invalid request".to_string());
-                    let response = JsonRpcResponse::error(id, error);
+                    let response = ResponseItem::error(id, error);
                     Ok(Some(response))
                 }
             }
@@ -572,7 +572,7 @@ pub struct MCPRequestService<S> {
 
 impl<S> MCPRequestService<S>
 where
-    S: Service<SendableMessage, Response = Option<JsonRpcResponse>, Error = Infallible>
+    S: Service<SendableMessage, Response = Option<ResponseItem>, Error = Infallible>
         + Clone
         + 'static,
 {
@@ -583,7 +583,7 @@ where
 
 impl<S> Service<Request> for MCPRequestService<S>
 where
-    S: Service<SendableMessage, Response = Option<JsonRpcResponse>, Error = Infallible>
+    S: Service<SendableMessage, Response = Option<ResponseItem>, Error = Infallible>
         + Clone
         + 'static,
 {
@@ -610,7 +610,7 @@ where
                             ErrorCode::InvalidRequest,
                             "Invalid request: batch is empty".to_string(),
                         );
-                        let response = JsonRpcResponse::error(RequestId::null(), error);
+                        let response = ResponseItem::error(RequestId::null(), error);
                         return Ok(Response::Single(Some(response)));
                     }
 

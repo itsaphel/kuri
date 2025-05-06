@@ -1,6 +1,6 @@
 use std::convert::Infallible;
 
-use kuri_mcp_protocol::jsonrpc::{JsonRpcResponse, SendableMessage};
+use kuri_mcp_protocol::jsonrpc::{ResponseItem, SendableMessage};
 use tower::Service;
 
 use crate::MCPRequestService;
@@ -13,7 +13,7 @@ pub trait ServiceExt<R>: Service<R> + Sized {
 
 impl<S> ServiceExt<SendableMessage> for S
 where
-    S: Service<SendableMessage, Response = Option<JsonRpcResponse>, Error = Infallible>
+    S: Service<SendableMessage, Response = Option<ResponseItem>, Error = Infallible>
         + Sized
         + Clone
         + 'static,

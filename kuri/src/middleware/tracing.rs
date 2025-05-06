@@ -5,7 +5,7 @@ use std::{
     task::{Context, Poll},
 };
 
-use kuri_mcp_protocol::jsonrpc::{JsonRpcResponse, SendableMessage};
+use kuri_mcp_protocol::jsonrpc::{ResponseItem, SendableMessage};
 use tower::{Layer, Service};
 use tracing::Level;
 
@@ -19,10 +19,10 @@ pub struct TracingService<S> {
 
 impl<S> Service<SendableMessage> for TracingService<S>
 where
-    S: Service<SendableMessage, Response = Option<JsonRpcResponse>, Error = Infallible>,
+    S: Service<SendableMessage, Response = Option<ResponseItem>, Error = Infallible>,
     S::Future: 'static,
 {
-    type Response = Option<JsonRpcResponse>;
+    type Response = Option<ResponseItem>;
     type Error = Infallible;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>;
 
@@ -71,7 +71,7 @@ impl TracingLayer {
 
 impl<S> Layer<S> for TracingLayer
 where
-    S: Service<SendableMessage, Response = Option<JsonRpcResponse>, Error = Infallible>,
+    S: Service<SendableMessage, Response = Option<ResponseItem>, Error = Infallible>,
     S::Future: 'static,
 {
     type Service = TracingService<S>;

@@ -1,6 +1,6 @@
 use anyhow::Result;
 use kuri::{
-    context::Inject, serve, tool, transport::StdioTransport, MCPServiceBuilder, ServiceExt
+    MCPServiceBuilder, ServiceExt, context::Inject, serve, tool, transport::StdioTransport,
 };
 use serde::Deserialize;
 use std::sync::atomic::{AtomicI32, Ordering};

@@ -4,7 +4,7 @@ mod common;
 use common::*;
 use kuri::MCPService;
 use kuri_mcp_protocol::{
-    jsonrpc::{ErrorCode, JsonRpcResponse, RequestId},
+    jsonrpc::{ErrorCode, RequestId, ResponseItem},
     messages::{CallToolResult, ListToolsResult},
     Content, TextContent,
 };
@@ -36,9 +36,9 @@ async fn test_tools_list() {
     validate_tools_list(response);
 }
 
-fn validate_tools_list(response: JsonRpcResponse) {
+fn validate_tools_list(response: ResponseItem) {
     match response {
-        JsonRpcResponse::Success { id, result, .. } => {
+        ResponseItem::Success { id, result, .. } => {
             assert_eq!(id, RequestId::Num(1));
 
             let actual: ListToolsResult = serde_json::from_value(result).unwrap();
@@ -72,7 +72,7 @@ fn validate_tools_list(response: JsonRpcResponse) {
             };
             assert_eq!(actual, expected);
         }
-        JsonRpcResponse::Error { .. } => {
+        ResponseItem::Error { .. } => {
             panic!("Expected success response");
         }
     }
@@ -107,7 +107,7 @@ async fn verify_calculator(server: &mut MCPService, tool_name: &str) {
     .unwrap();
 
     match response {
-        JsonRpcResponse::Success { id, result, .. } => {
+        ResponseItem::Success { id, result, .. } => {
             assert_eq!(id, RequestId::Num(1));
 
             let actual: CallToolResult = serde_json::from_value(result).unwrap();
@@ -121,7 +121,7 @@ async fn verify_calculator(server: &mut MCPService, tool_name: &str) {
             assert_eq!(actual.content[0], expected.content[0]);
             assert_eq!(actual.is_error, expected.is_error);
         }
-        JsonRpcResponse::Error { .. } => {
+        ResponseItem::Error { .. } => {
             panic!("Expected success response");
         }
     }
@@ -145,7 +145,7 @@ async fn test_tools_call_with_invalid_parameters() {
     .unwrap();
 
     match response {
-        JsonRpcResponse::Error { id, error, .. } => {
+        ResponseItem::Error { id, error, .. } => {
             assert_eq!(id, RequestId::Num(1));
             assert_eq!(error.code, ErrorCode::InvalidParams);
             assert_eq!(
@@ -174,10 +174,10 @@ async fn test_tools_call_with_invalid_parameters() {
     .unwrap();
 
     match response {
-        JsonRpcResponse::Success { .. } => {
+        ResponseItem::Success { .. } => {
             panic!("Expected error response");
         }
-        JsonRpcResponse::Error { id, error, .. } => {
+        ResponseItem::Error { id, error, .. } => {
             assert_eq!(id, RequestId::Num(1));
             assert_eq!(error.code, ErrorCode::InvalidParams);
             assert_eq!(
@@ -204,10 +204,10 @@ async fn test_tools_call_invalid_tool() {
     .unwrap();
 
     match response {
-        JsonRpcResponse::Success { .. } => {
+        ResponseItem::Success { .. } => {
             panic!("Expected error response");
         }
-        JsonRpcResponse::Error { id, error, .. } => {
+        ResponseItem::Error { id, error, .. } => {
             assert_eq!(id, RequestId::Num(1));
             assert_eq!(error.code, ErrorCode::InvalidParams);
             assert_eq!(error.message, "Tool not found: some_invalid_tool");
@@ -234,7 +234,7 @@ async fn test_tools_call_with_context() {
     .unwrap();
 
     match response {
-        JsonRpcResponse::Success { id, result, .. } => {
+        ResponseItem::Success { id, result, .. } => {
             assert_eq!(id, RequestId::Num(1));
             let actual: CallToolResult = serde_json::from_value(result).unwrap();
             let expected = CallToolResult {
@@ -244,7 +244,7 @@ async fn test_tools_call_with_context() {
             assert_eq!(actual.content, expected.content);
             assert_eq!(actual.is_error, expected.is_error);
         }
-        JsonRpcResponse::Error { .. } => {
+        ResponseItem::Error { .. } => {
             panic!("Expected success response");
         }
     }
@@ -262,7 +262,7 @@ async fn test_tools_call_with_context() {
     .unwrap();
 
     match response {
-        JsonRpcResponse::Success { id, result, .. } => {
+        ResponseItem::Success { id, result, .. } => {
             assert_eq!(id, RequestId::Num(1));
             let actual: CallToolResult = serde_json::from_value(result).unwrap();
             let expected = CallToolResult {
@@ -275,7 +275,7 @@ async fn test_tools_call_with_context() {
             assert_eq!(actual.content, expected.content);
             assert_eq!(actual.is_error, expected.is_error);
         }
-        JsonRpcResponse::Error { .. } => {
+        ResponseItem::Error { .. } => {
             panic!("Expected success response");
         }
     }
@@ -290,7 +290,7 @@ async fn test_tools_call_with_context() {
     .unwrap();
 
     match response {
-        JsonRpcResponse::Success { id, result, .. } => {
+        ResponseItem::Success { id, result, .. } => {
             assert_eq!(id, RequestId::Num(1));
             let actual: CallToolResult = serde_json::from_value(result).unwrap();
             let expected = CallToolResult {
@@ -303,7 +303,7 @@ async fn test_tools_call_with_context() {
             assert_eq!(actual.content, expected.content);
             assert_eq!(actual.is_error, expected.is_error);
         }
-        JsonRpcResponse::Error { .. } => {
+        ResponseItem::Error { .. } => {
             panic!("Expected success response when no arguments are provided, if none needed by the tool");
         }
     }

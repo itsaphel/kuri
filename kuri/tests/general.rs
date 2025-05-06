@@ -3,7 +3,7 @@ mod common;
 
 use common::*;
 use kuri_mcp_protocol::{
-    jsonrpc::{JsonRpcResponse, RequestId},
+    jsonrpc::{RequestId, ResponseItem},
     messages::{Implementation, InitializeResult, ServerCapabilities, ToolsCapability},
 };
 
@@ -17,10 +17,10 @@ async fn test_ping() {
         .unwrap();
 
     match response {
-        JsonRpcResponse::Success { result, .. } => {
+        ResponseItem::Success { result, .. } => {
             assert_eq!(result, serde_json::json!({}));
         }
-        JsonRpcResponse::Error { .. } => {
+        ResponseItem::Error { .. } => {
             panic!("Expected success response");
         }
     }
@@ -48,7 +48,7 @@ async fn test_initialize() {
     .unwrap();
 
     match response {
-        JsonRpcResponse::Success { id, result, .. } => {
+        ResponseItem::Success { id, result, .. } => {
             assert_eq!(id, RequestId::Num(1));
 
             let actual: InitializeResult = serde_json::from_value(result).unwrap();
@@ -69,7 +69,7 @@ async fn test_initialize() {
             };
             assert_eq!(actual, expected);
         }
-        JsonRpcResponse::Error { .. } => {
+        ResponseItem::Error { .. } => {
             panic!("Expected success response");
         }
     }
@@ -86,10 +86,10 @@ async fn test_unknown_method() {
         .unwrap();
 
     match response {
-        JsonRpcResponse::Success { .. } => {
+        ResponseItem::Success { .. } => {
             panic!("Expected error response");
         }
-        JsonRpcResponse::Error { error, .. } => {
+        ResponseItem::Error { error, .. } => {
             assert_eq!(error.code.code(), -32601);
         }
     }

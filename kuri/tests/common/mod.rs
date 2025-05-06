@@ -5,10 +5,10 @@ use kuri::MCPService;
 use kuri::MCPServiceBuilder;
 use kuri::ToolError;
 use kuri_macros::{prompt, tool};
-use kuri_mcp_protocol::jsonrpc::JsonRpcRequest;
-use kuri_mcp_protocol::jsonrpc::JsonRpcResponse;
+use kuri_mcp_protocol::jsonrpc::MethodCall;
 use kuri_mcp_protocol::jsonrpc::Params;
 use kuri_mcp_protocol::jsonrpc::RequestId;
+use kuri_mcp_protocol::jsonrpc::ResponseItem;
 use kuri_mcp_protocol::jsonrpc::SendableMessage;
 use serde::Deserialize;
 use tower::Service;
@@ -18,14 +18,14 @@ pub async fn call_server(
     server: &mut MCPService,
     method: &str,
     params: serde_json::Value,
-) -> Option<JsonRpcResponse> {
+) -> Option<ResponseItem> {
     let params = match params {
         serde_json::Value::Object(map) => Some(Params::Map(map)),
         serde_json::Value::Array(array) => Some(Params::Array(array)),
         _ => None,
     };
 
-    let request = JsonRpcRequest::new(RequestId::Num(1), method.to_string(), params);
+    let request = MethodCall::new(RequestId::Num(1), method.to_string(), params);
     let future = server.call(SendableMessage::from(request));
 
     future.await.unwrap()

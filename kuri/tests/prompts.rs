@@ -3,7 +3,7 @@ mod common;
 
 use common::*;
 use kuri_mcp_protocol::{
-    jsonrpc::{ErrorCode, JsonRpcResponse, RequestId},
+    jsonrpc::{ErrorCode, RequestId, ResponseItem},
     messages::{GetPromptResult, ListPromptsResult},
 };
 
@@ -19,7 +19,7 @@ async fn test_prompts_list() {
         .unwrap();
 
     match response {
-        JsonRpcResponse::Success { id, result, .. } => {
+        ResponseItem::Success { id, result, .. } => {
             assert_eq!(id, RequestId::Num(1));
 
             let actual: ListPromptsResult = serde_json::from_value(result).unwrap();
@@ -68,7 +68,7 @@ async fn test_prompts_list() {
                 assert_eq!(prompt.arguments, expected_prompt.arguments);
             }
         }
-        JsonRpcResponse::Error { .. } => {
+        ResponseItem::Error { .. } => {
             panic!("Expected success response");
         }
     }
@@ -92,7 +92,7 @@ async fn test_prompts_get_simple() {
     .unwrap();
 
     match response {
-        JsonRpcResponse::Success { id, result, .. } => {
+        ResponseItem::Success { id, result, .. } => {
             assert_eq!(id, RequestId::Num(1));
             let actual: GetPromptResult = serde_json::from_value(result).unwrap();
             let expected = GetPromptResult {
@@ -106,7 +106,7 @@ async fn test_prompts_get_simple() {
             };
             assert_eq!(actual, expected);
         }
-        JsonRpcResponse::Error { .. } => {
+        ResponseItem::Error { .. } => {
             panic!("Expected success response");
         }
     }
@@ -128,7 +128,7 @@ async fn test_prompts_get_invalid_prompt() {
     .unwrap();
 
     match response {
-        JsonRpcResponse::Error { id, error, .. } => {
+        ResponseItem::Error { id, error, .. } => {
             assert_eq!(id, RequestId::Num(1));
             assert_eq!(error.code, ErrorCode::InvalidParams);
             assert_eq!(
@@ -162,7 +162,7 @@ async fn test_prompts_get_optional_params() {
     .unwrap();
 
     match response {
-        JsonRpcResponse::Success { id, result, .. } => {
+        ResponseItem::Success { id, result, .. } => {
             assert_eq!(id, RequestId::Num(1));
             let actual: GetPromptResult = serde_json::from_value(result).unwrap();
             let expected = GetPromptResult {
@@ -176,7 +176,7 @@ async fn test_prompts_get_optional_params() {
             };
             assert_eq!(actual, expected);
         }
-        JsonRpcResponse::Error { .. } => {
+        ResponseItem::Error { .. } => {
             panic!("Expected success response");
         }
     }
@@ -196,7 +196,7 @@ async fn test_prompts_get_optional_params() {
     .unwrap();
 
     match response {
-        JsonRpcResponse::Success { id, result, .. } => {
+        ResponseItem::Success { id, result, .. } => {
             assert_eq!(id, RequestId::Num(1));
             let actual: GetPromptResult = serde_json::from_value(result).unwrap();
             let expected = GetPromptResult {
@@ -210,7 +210,7 @@ async fn test_prompts_get_optional_params() {
             };
             assert_eq!(actual, expected);
         }
-        JsonRpcResponse::Error { .. } => {
+        ResponseItem::Error { .. } => {
             panic!("Expected success response");
         }
     }

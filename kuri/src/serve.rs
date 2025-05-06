@@ -1,7 +1,7 @@
 use crate::transport::{MessageParseError, TransportError};
 use futures::{SinkExt, StreamExt};
 use kuri_mcp_protocol::jsonrpc::{
-    ErrorCode, ErrorData, JsonRpcResponse, Request, RequestId, Response,
+    ErrorCode, ErrorData, Request, RequestId, Response, ResponseItem,
 };
 use std::convert::Infallible;
 use tokio::io::{AsyncRead, AsyncWrite};
@@ -62,7 +62,7 @@ where
                             ErrorCode::ParseError,
                             "JSON parsing error when deserialising the message".to_string(),
                         );
-                        let msg = JsonRpcResponse::error(RequestId::Null, error_data);
+                        let msg = ResponseItem::error(RequestId::Null, error_data);
                         write_message(&mut frame, Response::Single(Some(msg))).await?;
                         tracing::debug!(error = ?e, "Transport error (deserialisation)");
                     }
