@@ -1,11 +1,12 @@
-#[allow(unused)]
 mod common;
 
-use common::*;
+use common::call_server;
+use kuri::{prompt, MCPService, MCPServiceBuilder};
 use kuri_mcp_protocol::{
     jsonrpc::{ErrorCode, RequestId, ResponseItem},
     messages::{GetPromptResult, ListPromptsResult},
 };
+use tracing_subscriber::EnvFilter;
 
 // Prompt tests
 // Spec: https://spec.modelcontextprotocol.io/specification/2025-03-26/server/prompts/
@@ -214,4 +215,43 @@ async fn test_prompts_get_optional_params() {
             panic!("Expected success response");
         }
     }
+}
+
+#[prompt(
+    description = "Generates a code review prompt for the provided code",
+    params(code = "The code to review")
+)]
+async fn review_code(code: String) -> String {
+    format!("Please review this code:\n\n{}", code)
+}
+
+#[prompt(
+    description = "Generates a prompt for summarising text",
+    params(
+        text = "The text to summarise",
+        format = "Optional format for the summary (e.g., 'bullet points', 'paragraph')"
+    )
+)]
+async fn summarise_text(text: String, format: Option<String>) -> String {
+    let format_instruction = match format {
+        Some(f) => format!(" in the format of {}", f),
+        None => String::new(),
+    };
+
+    format!(
+        "Please summarize the following text{}:\n\n{}",
+        format_instruction, text
+    )
+}
+
+pub fn init_prompt_server() -> MCPService {
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter(EnvFilter::from_default_env())
+        .with_test_writer()
+        .try_init();
+
+    MCPServiceBuilder::new("Prompt Server".to_string())
+        .with_prompt(ReviewCode)
+        .with_prompt(SummariseText)
+        .build()
 }

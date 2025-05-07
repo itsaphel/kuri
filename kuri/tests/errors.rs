@@ -1,15 +1,15 @@
-#[allow(unused)]
-mod common;
-
-use common::init_tool_server_simple;
-use kuri::{serve, ServiceExt};
+use kuri::{serve, tool, MCPService, MCPServiceBuilder, ServiceExt};
+use schemars::JsonSchema;
+use serde::Deserialize;
 use std::{
+    fmt::Display,
     io,
     pin::Pin,
     sync::{Arc, Mutex},
     task::{Context, Poll},
 };
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
+use tracing_subscriber::EnvFilter;
 
 macro_rules! assert_json_eq {
     ($actual:expr, $expected:expr) => {
@@ -60,20 +60,31 @@ async fn test_method_not_found() {
 
 #[tokio::test]
 async fn test_logical_param_errors() {
+    // Missing arguments
     let response = request(
-        r#"{"jsonrpc": "2.0", "method": "tools/call", "params": {"name": "calculator", "arguments": {"x": "not_a_number", "y": 2, "operation": "add"}}, "id": 1}"#,
+        r#"{"jsonrpc": "2.0", "method": "tools/call", "params": {"name": "hello_world_tool", "arguments": {}}, "id": 1}"#,
     ).await;
     assert_json_eq!(
         &response,
         r#"{"jsonrpc": "2.0", "error": {"code": -32602, "message": "Invalid parameters: Missing or incorrect tool arguments"}, "id": 1}"#
     );
 
+    // Type is incorrect
     let response = request(
-        r#"{"jsonrpc": "2.0", "method": "tools/call", "params": {"name": "calculator", "arguments": {"x": 1, "y": 2, "operation": "invalid_operation"}}, "id": 1}"#,
+        r#"{"jsonrpc": "2.0", "method": "tools/call", "params": {"name": "hello_world_tool", "arguments": {"inty": "not_a_number"}}, "id": 1}"#,
     ).await;
     assert_json_eq!(
         &response,
-        r#"{"jsonrpc": "2.0", "error": {"code": -32602, "message": "Invalid parameters: Unknown operation: invalid_operation"}, "id": 1}"#
+        r#"{"jsonrpc": "2.0", "error": {"code": -32602, "message": "Invalid parameters: Missing or incorrect tool arguments"}, "id": 1}"#
+    );
+
+    // value doesn't match enum variant
+    let response = request(
+        r#"{"jsonrpc": "2.0", "method": "tools/call", "params": {"name": "echo_name", "arguments": {"name": "unrecognised_name"}}, "id": 1}"#,
+    ).await;
+    assert_json_eq!(
+        &response,
+        r#"{"jsonrpc": "2.0", "error": {"code": -32602, "message": "Invalid parameters: Missing or incorrect tool arguments"}, "id": 1}"#
     );
 }
 
@@ -198,7 +209,7 @@ impl AsyncWrite for MockTransport {
 impl Unpin for MockTransport {}
 
 async fn request(input: &str) -> String {
-    let service = init_tool_server_simple();
+    let service = init_simple_server();
     let mut transport = MockTransport::new();
     transport.set_read_buf(format!("{}\n", input).as_bytes());
 
@@ -216,4 +227,41 @@ async fn request(input: &str) -> String {
     // // Assert it's serialisable (or not)
     // let response = serde_json::from_str::<JsonRpcResponse>(lines[0])
     //     .expect("No valid JSON-RPC response found");
+}
+
+#[tool]
+async fn hello_world_tool(int: i32) -> String {
+    format!("Hello, {}!", int)
+}
+
+#[derive(Deserialize, JsonSchema)]
+enum Names {
+    Bob,
+    Alice,
+}
+
+impl Display for Names {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Names::Bob => write!(f, "Bob"),
+            Names::Alice => write!(f, "Alice"),
+        }
+    }
+}
+
+#[tool]
+async fn echo_name(name: Names) -> String {
+    format!("Hello, {}!", name)
+}
+
+pub fn init_simple_server() -> MCPService {
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter(EnvFilter::from_default_env())
+        .with_test_writer()
+        .try_init();
+
+    MCPServiceBuilder::new("Simple server".to_string())
+        .with_tool(HelloWorldTool)
+        .with_tool(EchoName)
+        .build()
 }
