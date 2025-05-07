@@ -125,3 +125,24 @@ impl<E: Into<String>> From<E> for DisplayableError {
         DisplayableError(err.into())
     }
 }
+
+/// Handler returns a Result<T, String>
+/// We treat these as logical errors, converting String to DisplayableError.
+impl<T> IntoCallToolResult for Result<T, String>
+where
+    T: IntoCallToolResult,
+{
+    fn into_call_tool_result(self) -> Result<CallToolResult, ToolError> {
+        match self {
+            Ok(value) => value.into_call_tool_result(),
+            Err(string_err) => {
+                // Convert String to DisplayableError and then use its logic
+                let displayable_err = DisplayableError::from(string_err);
+                Ok(CallToolResult {
+                    content: vec![Content::text(displayable_err.to_string())],
+                    is_error: true,
+                })
+            }
+        }
+    }
+}
