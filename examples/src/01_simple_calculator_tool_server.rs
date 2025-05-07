@@ -46,13 +46,9 @@ async fn main() -> Result<()> {
     tracing::info!("Starting MCP server");
 
     // Create the MCP service and add our tools
-    let service = MCPServiceBuilder::new(
-        "Calculator".to_string(),
-        "This server provides a `calculator` tool that can perform basic arithmetic operations."
-            .to_string(),
-    )
-    .with_tool(Calculator)
-    .build();
+    let service = MCPServiceBuilder::new("Calculator".to_string())
+        .with_tool(Calculator)
+        .build();
 
     tracing::info!(
         "Starting server over stdin. Logging to {}",

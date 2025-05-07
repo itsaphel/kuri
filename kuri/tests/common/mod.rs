@@ -122,12 +122,9 @@ pub fn init_tool_server_simple() -> MCPService {
         .with_test_writer()
         .try_init();
 
-    MCPServiceBuilder::new(
-        "Calculator".to_string(),
-        "Test calculator server".to_string(),
-    )
-    .with_tool(Calculator)
-    .build()
+    MCPServiceBuilder::new("Calculator".to_string())
+        .with_tool(Calculator)
+        .build()
 }
 
 pub fn init_tool_server_no_desc() -> MCPService {
@@ -136,12 +133,9 @@ pub fn init_tool_server_no_desc() -> MCPService {
         .with_test_writer()
         .try_init();
 
-    MCPServiceBuilder::new(
-        "Calculator".to_string(),
-        "Test calculator server".to_string(),
-    )
-    .with_tool(CalculatorNoDesc)
-    .build()
+    MCPServiceBuilder::new("Calculator".to_string())
+        .with_tool(CalculatorNoDesc)
+        .build()
 }
 
 pub fn init_tool_server_with_ctx() -> MCPService {
@@ -150,7 +144,7 @@ pub fn init_tool_server_with_ctx() -> MCPService {
         .with_test_writer()
         .try_init();
 
-    MCPServiceBuilder::new("Counter".to_string(), "Test counter server".to_string())
+    MCPServiceBuilder::new("Counter".to_string())
         .with_tool(Increment)
         .with_tool(Decrement)
         .with_tool(GetValue)
@@ -164,11 +158,8 @@ pub fn init_prompt_server() -> MCPService {
         .with_test_writer()
         .try_init();
 
-    MCPServiceBuilder::new(
-        "Prompt Server".to_string(),
-        "Test prompt server".to_string(),
-    )
-    .with_prompt(ReviewCode)
-    .with_prompt(SummariseText)
-    .build()
+    MCPServiceBuilder::new("Prompt Server".to_string())
+        .with_prompt(ReviewCode)
+        .with_prompt(SummariseText)
+        .build()
 }
