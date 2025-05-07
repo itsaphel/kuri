@@ -22,8 +22,22 @@ The above is some of what sets us apart from other MCP server crates. We're focu
 ## Example
 
 ```rust
-// A stateless calculator: the function is pure, takes three inputs, and returns an integer.
-// The tool annotation can contain optional descriptions of the function and arguments to help the model decide which tool to use, and provide the right arguments.
+use kuri::{MCPServiceBuilder, ServiceExt, ToolError, prompt, serve, tool, transport::StdioTransport};
+use schemars::JsonSchema;
+use serde::Deserialize;
+
+#[derive(Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum Operation {
+    Add,
+    Subtract,
+    Multiply,
+    Divide,
+}
+
+// A pure function that takes three inputs and returns an integer. Descriptions
+// for the tool and its parameters help the model decide which tool to use, and
+// correctly supply the tool's parameters.
 #[tool(
     description = "Perform basic arithmetic operations",
     params(
@@ -32,28 +46,24 @@ The above is some of what sets us apart from other MCP server crates. We're focu
         operation = "The operation to perform (add, subtract, multiply, divide)"
     )
 )]
-async fn calculator(x: i32, y: i32, operation: String) -> Result<i32, ToolError> {
-    match operation.as_str() {
-        "add" => Ok(x + y),
-        "subtract" => Ok(x - y),
-        "multiply" => Ok(x * y),
-        "divide" => {
+async fn calculator(x: i32, y: i32, operation: Operation) -> Result<i32, ToolError> {
+    match operation {
+        Operation::Add => Ok(x + y),
+        Operation::Subtract => Ok(x - y),
+        Operation::Multiply => Ok(x * y),
+        Operation::Divide => {
             if y == 0 {
                 Err(ToolError::ExecutionError("Division by zero".to_string()))
             } else {
                 Ok(x / y)
             }
         }
-        _ => Err(ToolError::InvalidParameters(format!(
-            "Unknown operation: {}",
-            operation
-        ))),
     }
 }
 
-// A prompt to summarise text. When invoked, the LLM provides the text to summarise, and (optionally) a format.
-// The format argument uses Rust's standard `Option` type. Behind the scenes, kuri uses this fact to tell the model it may omit `format`
-// kuri returns the constructed response to the client
+// Creates a prompt template for text summarisation. The application provides
+// the text to summarise, and an optional format parameter (denoted using Rust's
+// `Option` type). kuri tells the model that `format` may be omitted.
 #[prompt(
     description = "Generates a prompt for summarising text",
     params(
@@ -83,8 +93,7 @@ async fn main() -> Result<(), TransportError> {
         .build();
 
     // Serve over the stdio transport
-    serve(service, StdioTransport::new()).await?;
-    Ok(())
+    serve(service.into_request_service(), StdioTransport::new()).await
 }
 ```
 

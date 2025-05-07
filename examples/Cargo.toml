@@ -24,8 +24,8 @@ rand = "0.8"
 tokio-util = { version = "0.7", features = ["io", "codec"] }
 
 [[example]]
-name = "01_simple_calculator_tool_server"
-path = "src/01_simple_calculator_tool_server.rs"
+name = "01_readme_example"
+path = "src/01_readme_example.rs"
 
 [[example]]
 name = "02_stateful_counter_tool_server"
