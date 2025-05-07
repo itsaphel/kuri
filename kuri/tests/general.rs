@@ -1,16 +1,17 @@
-#[allow(unused)]
 mod common;
 
-use common::*;
+use common::call_server;
+use kuri::{tool, MCPService, MCPServiceBuilder};
 use kuri_mcp_protocol::{
     jsonrpc::{RequestId, ResponseItem},
     messages::{Implementation, InitializeResult, ServerCapabilities, ToolsCapability},
 };
+use tracing_subscriber::EnvFilter;
 
 // Utility (ping): https://spec.modelcontextprotocol.io/specification/2025-03-26/basic/utilities/ping/
 #[tokio::test]
 async fn test_ping() {
-    let mut server = init_tool_server_simple();
+    let mut server = init_simple_server();
 
     let response = call_server(&mut server, "ping", serde_json::json!({}))
         .await
@@ -30,7 +31,7 @@ async fn test_ping() {
 // Spec: https://spec.modelcontextprotocol.io/specification/2025-03-26/basic/lifecycle/#initialization
 #[tokio::test]
 async fn test_initialize() {
-    let mut server = init_tool_server_simple();
+    let mut server = init_simple_server();
 
     let response = call_server(
         &mut server,
@@ -62,10 +63,10 @@ async fn test_initialize() {
                     }),
                 },
                 server_info: Implementation {
-                    name: "Calculator".to_string(),
+                    name: "Simple server".to_string(),
                     version: "0.1.0".to_string(),
                 },
-                instructions: Some("Test calculator server".to_string()),
+                instructions: None,
             };
             assert_eq!(actual, expected);
         }
@@ -79,7 +80,7 @@ async fn test_initialize() {
 
 #[tokio::test]
 async fn test_unknown_method() {
-    let mut server = init_tool_server_simple();
+    let mut server = init_simple_server();
 
     let response = call_server(&mut server, "unknown_method", serde_json::json!({}))
         .await
@@ -93,4 +94,20 @@ async fn test_unknown_method() {
             assert_eq!(error.code.code(), -32601);
         }
     }
+}
+
+#[tool]
+async fn hello_world_tool(int: i32) -> String {
+    format!("Hello, {}!", int)
+}
+
+pub fn init_simple_server() -> MCPService {
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter(EnvFilter::from_default_env())
+        .with_test_writer()
+        .try_init();
+
+    MCPServiceBuilder::new("Simple server".to_string())
+        .with_tool(HelloWorldTool)
+        .build()
 }
