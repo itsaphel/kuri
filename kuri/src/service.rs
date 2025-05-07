@@ -21,7 +21,7 @@ use kuri_mcp_protocol::{
 use serde_json::json;
 use serde_json::Value;
 use std::task::Poll;
-use std::{collections::HashMap, future::Future, pin::Pin};
+use std::{collections::HashMap, future::Future};
 use std::{convert::Infallible, rc::Rc};
 use tower::Service;
 
@@ -183,18 +183,15 @@ trait MCPServiceTrait: 'static {
         &self,
         tool_name: &str,
         arguments: Value,
-    ) -> Pin<Box<dyn Future<Output = Result<CallToolResult, ToolError>> + '_>>;
+    ) -> LocalBoxFuture<'static, Result<CallToolResult, ToolError>>;
     fn list_resources(&self) -> Vec<ResourceMeta>;
-    fn read_resource(
-        &self,
-        uri: &str,
-    ) -> Pin<Box<dyn Future<Output = Result<String, ResourceError>> + 'static>>;
+    fn read_resource(&self, uri: &str) -> LocalBoxFuture<'static, Result<String, ResourceError>>;
     fn list_prompts(&self) -> Vec<PromptMeta>;
     fn get_prompt(
         &self,
         prompt_name: &str,
         arguments: HashMap<String, serde_json::Value>,
-    ) -> Pin<Box<dyn Future<Output = Result<String, PromptError>> + '_>>;
+    ) -> LocalBoxFuture<'static, Result<String, PromptError>>;
 }
 
 impl MCPServiceTrait for MCPService {
@@ -243,16 +240,17 @@ impl MCPServiceTrait for MCPService {
         &self,
         tool_name: &str,
         arguments: serde_json::Value,
-    ) -> Pin<Box<dyn Future<Output = Result<CallToolResult, ToolError>> + '_>> {
+    ) -> LocalBoxFuture<'static, Result<CallToolResult, ToolError>> {
         let tool = match self.tools.get(tool_name) {
-            Some(tool) => tool,
+            Some(tool) => tool.clone(),
             None => {
                 return Box::pin(futures::future::ready(Err(ToolError::NotFound(
                     tool_name.to_string(),
                 ))))
             }
         };
-        Box::pin(async move { tool.call(&self.ctx, arguments).await })
+        let ctx = self.ctx.clone();
+        Box::pin(async move { tool.call(&ctx, arguments).await })
     }
 
     fn list_resources(&self) -> Vec<ResourceMeta> {
@@ -260,10 +258,7 @@ impl MCPServiceTrait for MCPService {
         vec![]
     }
 
-    fn read_resource(
-        &self,
-        _uri: &str,
-    ) -> Pin<Box<dyn Future<Output = Result<String, ResourceError>> + 'static>> {
+    fn read_resource(&self, _uri: &str) -> LocalBoxFuture<'static, Result<String, ResourceError>> {
         // TODO implement
         Box::pin(futures::future::ready(Err(ResourceError::ExecutionError(
             "Reading resources is not yet implemented".into(),
@@ -288,18 +283,18 @@ impl MCPServiceTrait for MCPService {
         &self,
         prompt_name: &str,
         arguments: HashMap<String, serde_json::Value>,
-    ) -> Pin<Box<dyn Future<Output = Result<String, PromptError>> + '_>> {
-        // TODO: Write more idiomatic, and ideally move into the async block.
+    ) -> LocalBoxFuture<'static, Result<String, PromptError>> {
         let prompt = match self.prompts.get(prompt_name) {
-            Some(prompt) => prompt,
+            Some(prompt) => prompt.clone(),
             None => {
                 return Box::pin(futures::future::ready(Err(PromptError::NotFound(
                     prompt_name.to_string(),
                 ))));
             }
         };
+        let ctx = self.ctx.clone();
         Box::pin(async move {
-            let result = prompt.call(&self.ctx, arguments).await?;
+            let result = prompt.call(&ctx, arguments).await?;
             Ok(result)
         })
     }
