@@ -1,8 +1,3 @@
-// The protocol defined here is largely spec compliant.
-//
-// Deviations:
-// * No batching support
-// * Requests and responses are assumed to be client-generated, not bi-directional.
 use serde::{de, Deserialize, Serialize};
 use serde_json::Value;
 use valuable::Valuable;
