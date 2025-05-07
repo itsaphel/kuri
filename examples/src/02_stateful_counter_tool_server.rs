@@ -47,15 +47,12 @@ async fn main() -> Result<()> {
         .init();
 
     // Create the MCP service and add our tools
-    let service = MCPServiceBuilder::new(
-        "Counter".to_string(),
-        "This server provides a counter tool that can increment and decrement a counter. You can also get the current value of the counter.".to_string()
-    )
-    .with_tool(Increment)
-    .with_tool(Decrement)
-    .with_tool(GetValue)
-    .with_state(Inject::new(Counter::default()))
-    .build();
+    let service = MCPServiceBuilder::new("Counter".to_string())
+        .with_tool(Increment)
+        .with_tool(Decrement)
+        .with_tool(GetValue)
+        .with_state(Inject::new(Counter::default()))
+        .build();
 
     tracing::info!(
         "Starting server over stdin/stdout. Logging to {}",

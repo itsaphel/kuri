@@ -16,7 +16,7 @@
 //!
 //! #[tokio::main]
 //! async fn main() -> Result<(), TransportError> {
-//!     let service = MCPServiceBuilder::new("Hello World".to_string(), "A server with a 'hello world' tool".to_string())
+//!     let service = MCPServiceBuilder::new("Hello World".to_string())
 //!         .with_tool(HelloWorldTool)
 //!         .build();
 //!
@@ -62,10 +62,7 @@
 //!     println!("Notification received: {:?}", notification.method);
 //! }
 //!
-//! let mut service = MCPServiceBuilder::new(
-//!     "Notification server".to_string(),
-//!     "Test notification server".to_string(),
-//! )
+//! let mut service = MCPServiceBuilder::new("Notification server".to_string())
 //!     .with_notification_handler(move |_, notification| {
 //!         Box::pin(my_notification_handler(notification))
 //!     })
@@ -101,7 +98,7 @@
 //! #     "Hello World".to_string()
 //! # }
 //!
-//! let service = MCPServiceBuilder::new("Hello World".to_string(), "A server with a 'hello world' tool".to_string())
+//! let service = MCPServiceBuilder::new("Hello World".to_string())
 //!     .with_tool(HelloWorldTool)
 //!     .build();
 //!

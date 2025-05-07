@@ -39,7 +39,7 @@ type NotificationHandler = Rc<dyn Fn(&Context, Notification) -> LocalBoxFuture<'
 #[derive(Clone)]
 pub struct MCPService {
     name: String,
-    description: String,
+    instructions: Option<String>,
     tools: Rc<Tools>,
     prompts: Rc<Prompts>,
     ctx: Rc<Context>,
@@ -52,7 +52,7 @@ pub struct MCPService {
 /// modified after that time.
 pub struct MCPServiceBuilder {
     name: String,
-    description: String,
+    instructions: Option<String>,
     tools: Tools,
     prompts: Prompts,
     ctx: Context,
@@ -62,15 +62,20 @@ pub struct MCPServiceBuilder {
 }
 
 impl MCPServiceBuilder {
-    pub fn new(name: String, description: String) -> Self {
+    pub fn new(name: String) -> Self {
         Self {
             name,
-            description,
+            instructions: None,
             tools: HashMap::new(),
             prompts: HashMap::new(),
             ctx: Context::default(),
             notification_handler: None,
         }
+    }
+
+    pub fn with_instructions(mut self, instructions: String) -> Self {
+        self.instructions = Some(instructions);
+        self
     }
 
     pub fn with_tool(mut self, tool: impl ToolHandler) -> Self {
@@ -100,7 +105,7 @@ impl MCPServiceBuilder {
     pub fn build(self) -> MCPService {
         MCPService {
             name: self.name,
-            description: self.description,
+            instructions: self.instructions,
             tools: Rc::new(self.tools),
             prompts: Rc::new(self.prompts),
             ctx: Rc::new(self.ctx),
@@ -170,8 +175,7 @@ impl CapabilitiesBuilder {
 
 trait MCPServiceTrait: 'static {
     fn name(&self) -> String;
-    // in the protocol, instructions are optional but we make it required
-    fn instructions(&self) -> String;
+    fn instructions(&self) -> Option<String>;
     fn capabilities(&self) -> ServerCapabilities;
 
     fn list_tools(&self) -> Vec<ToolMeta>;
@@ -198,8 +202,8 @@ impl MCPServiceTrait for MCPService {
         self.name.clone()
     }
 
-    fn instructions(&self) -> String {
-        self.description.clone()
+    fn instructions(&self) -> Option<String> {
+        self.instructions.clone()
     }
 
     fn capabilities(&self) -> kuri_mcp_protocol::messages::ServerCapabilities {
@@ -344,7 +348,7 @@ impl MCPService {
                     name: self.name(),
                     version: env!("CARGO_PKG_VERSION").to_string(),
                 },
-                instructions: Some(self.instructions()),
+                instructions: self.instructions(),
             };
 
             // Serialise response
@@ -663,19 +667,16 @@ mod tests {
         let called = Rc::new(RefCell::new(false));
         let called_clone = called.clone();
 
-        let mut server = MCPServiceBuilder::new(
-            "Notification server".to_string(),
-            "Test notification server".to_string(),
-        )
-        .with_notification_handler(move |_, notification| {
-            let called = called_clone.clone();
-            Box::pin(async move {
-                if notification.method == "my_notification" {
-                    *called.borrow_mut() = true;
-                }
+        let mut server = MCPServiceBuilder::new("Notification server".to_string())
+            .with_notification_handler(move |_, notification| {
+                let called = called_clone.clone();
+                Box::pin(async move {
+                    if notification.method == "my_notification" {
+                        *called.borrow_mut() = true;
+                    }
+                })
             })
-        })
-        .build();
+            .build();
 
         // When
         let _ = server

@@ -44,13 +44,10 @@ async fn main() -> Result<()> {
         .init();
 
     // Create the MCP service and add our prompt handlers
-    let service = MCPServiceBuilder::new(
-        "Prompt Server".to_string(),
-        "This server provides prompt templates for various tasks. Use the available prompts to generate formatted prompts for specific tasks.".to_string()
-    )
-    .with_prompt(ReviewCode)
-    .with_prompt(SummariseText)
-    .build();
+    let service = MCPServiceBuilder::new("Prompt Server".to_string())
+        .with_prompt(ReviewCode)
+        .with_prompt(SummariseText)
+        .build();
 
     // Serve over the stdio transport
     serve(service.into_request_service(), StdioTransport::new()).await?;
