@@ -1,6 +1,6 @@
 [package]
 name = "kuri_macros"
-version = "0.1.0"
+version = "0.1.1"
 description = "macros for kuri, the MCP server SDK"
 repository = "https://github.com/itsaphel/kuri"
 homepage = "https://github.com/itsaphel/kuri"
