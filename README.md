@@ -22,8 +22,18 @@ The above is some of what sets us apart from other MCP server crates. We're focu
 ## Example
 
 ```rust
-use kuri::transport::{StdioTransport, TransportError};
-use kuri::{MCPServiceBuilder, ServiceExt, prompt, serve, tool};
+use kuri::{MCPServiceBuilder, ServiceExt, prompt, serve, tool, transport::StdioTransport};
+use schemars::JsonSchema;
+use serde::Deserialize;
+
+#[derive(Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum Operation {
+    Add,
+    Subtract,
+    Multiply,
+    Divide,
+}
 
 // A pure function that takes three inputs and returns an integer. Descriptions
 // for the tool and its parameters help the model decide which tool to use, and
@@ -36,19 +46,18 @@ use kuri::{MCPServiceBuilder, ServiceExt, prompt, serve, tool};
         operation = "The operation to perform (add, subtract, multiply, divide)"
     )
 )]
-async fn calculator(x: i32, y: i32, operation: String) -> Result<i32, String> {
-    match operation.as_str() {
-        "add" => Ok(x + y),
-        "subtract" => Ok(x - y),
-        "multiply" => Ok(x * y),
-        "divide" => {
+async fn calculator(x: i32, y: i32, operation: Operation) -> Result<i32, String> {
+    match operation {
+        Operation::Add => Ok(x + y),
+        Operation::Subtract => Ok(x - y),
+        Operation::Multiply => Ok(x * y),
+        Operation::Divide => {
             if y == 0 {
                 Err("Division by zero".to_string())
             } else {
                 Ok(x / y)
             }
         }
-        _ => Err(format!("Unknown operation: {}", operation)),
     }
 }
 
