@@ -7,27 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.2.0](https://github.com/itsaphel/kuri/compare/kuri-v0.1.0...kuri-v0.2.0) - 2025-05-12
+## [0.2.0](https://github.com/itsaphel/kuri/compare/v0.1.0...kuri-v0.2.0) - 2025-05-12
 
-### Other
-
-- doc links and minor copyedit
-- use `LocalBoxFuture` in `service.rs`
-- Use readme as first example, and use enum for Operation
-- cleanup integration tests, add test for enums in tool handlers
-- Server description -> instructions, and make instructions optional
-- Notification handlers
-- rename JSON-RPC structs
-- Support JSON-RPC batching and improve error handling
-- split integration tests into separate files
-- `Tool`/`Prompt`/`Resource` -> `ToolMeta`/`PromptMeta`/`ResourceMeta` use aliases
-- `context.rs` and `handler.rs`
-- `is_error: Option<bool>` -> `is_error: bool`
-- Error handling improvements/cleanups
-- extract repeated code
-- Add and improve integration tests
-- Tower layer documentation + example (tracing middleware)
-- `lib.rs` documentation
-- Increase flexibility in tool handler return types (adds a `IntoCallToolResponse`)
-- README and CI updates
 - Transport rewrite ([#1](https://github.com/itsaphel/kuri/pull/1))
+- Increase flexibility in tool handler return types (adds a `IntoCallToolResponse`)
+- Server `description` -> `instructions`, and make instructions optional
+- Notification handlers
+- Support JSON-RPC batching
+- Rename JSON-RPC structs
+- Error handling improvements
+
+### Internal and documentation
+
+- Documentation (`lib.rs`, README, etc)
+- Tower layer documentation + example (tracing middleware)
+- Integration testing improvements
+- `is_error: Option<bool>` -> `is_error: bool`
+- Various code improvements
