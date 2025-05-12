@@ -1,6 +1,6 @@
 [package]
 name = "kuri"
-version = "0.1.0"
+version = "0.2.0"
 description = """
 An SDK for building MCP servers, focused on elegant developer experience, where tools and prompts
 are just plain old Rust functions.
@@ -16,8 +16,8 @@ license.workspace = true
 publish = true
 
 [dependencies]
-kuri_macros = { version = "0.1.0", path = "../kuri_macros" }
-kuri_mcp_protocol = { version = "0.1.0", path = "../kuri_mcp_protocol" }
+kuri_macros = { version = "0.1.1", path = "../kuri_macros" }
+kuri_mcp_protocol = { version = "0.2.0", path = "../kuri_mcp_protocol" }
 
 async-trait = "0.1"
 futures = { version = "0.3", default-features = false, features = ["std"] }
