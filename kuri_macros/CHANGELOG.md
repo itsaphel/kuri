@@ -7,9 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.1.1](https://github.com/itsaphel/kuri/compare/kuri_macros-v0.1.0...kuri_macros-v0.1.1) - 2025-05-12
+## [0.1.1](https://github.com/itsaphel/kuri/compare/v0.1.0...kuri_macros-v0.1.1) - 2025-05-12
 
 ### Other
 
-- split macros into separate files
-- Increase flexibility in tool handler return types (adds a `IntoCallToolResponse`)
+- Split macros into separate files
+- Increase flexibility in tool handler return types (via `IntoCallToolResponse`)
