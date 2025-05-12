@@ -1,6 +1,6 @@
 [package]
 name = "kuri_mcp_protocol"
-version = "0.1.0"
+version = "0.2.0"
 description = "Core types for the MCP protocol"
 repository = "https://github.com/itsaphel/kuri"
 homepage = "https://github.com/itsaphel/kuri"
