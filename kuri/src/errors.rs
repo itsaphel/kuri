@@ -3,6 +3,8 @@ use thiserror::Error;
 /// Errors raised while *processing* a request.
 /// These errors assume that the request is valid and was successfully parsed. Errors for invalid
 /// requests are handled at the transport level, within [`MessageParseError`].
+///
+/// [`MessageParseError`]: crate::transport::MessageParseError
 #[derive(Error, Debug)]
 pub enum RequestError {
     #[error("Method not found: {0}")]

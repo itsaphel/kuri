@@ -24,7 +24,7 @@
 //! }
 //! ```
 //!
-//! There are more [`examples`] in the repository.
+//! There are more [examples] in the repository.
 //!
 //! # Getting started
 //!
@@ -44,15 +44,15 @@
 //!
 //! # Defining tools and prompts
 //!
-//! Handlers are called when a tool or prompt is invoked, and define the behaviour of that tool or
-//! prompt. They're just normal Rust functions, and can return any type that implements
-//! [`IntoCallToolResult`]. Since handlers are just Rust functions, you can use them as normal.
-//! Testing is also straightforward; just call the function directly.
+//! Handlers are the functions invoked when a tool or prompt is invoked. They're just normal Rust
+//! functions, and can return any type that implements [`IntoCallToolResult`]. Since handlers are
+//! just Rust functions, you can use them as normal. Testing is also straightforward; just call the
+//! function directly.
 //!
 //! # Handling notifications
 //!
-//! To handle notifications, you'll need to define your own function to handle [`Notification`] and
-//! provide this to the [`MCPServiceBuilder`] when building your service.
+//! If you wish to handle notifications, you'll need to define your own function to handle the raw
+//! [`Notification`] and provide this function to the [`MCPServiceBuilder`] when building your service.
 //!
 //! ```rust
 //! use kuri::{MCPServiceBuilder};
@@ -71,16 +71,18 @@
 //!
 //! ## Error handling
 //!
-//! The MCP protocol supports two types of errors: RPC errors, and logical errors. In tool handlers,
-//! both errors are combined within the same struct, [`ToolError`].
+//! The MCP protocol supports two types of errors: RPC errors, and logical errors. kuri tool handlers
+//! can return a [`ToolError`], which combines both types of errors (`ExecutionError` is mapped to
+//! logical errors). You can return your own error type if you prefer; just implement
+//! [`IntoCallToolResult`] for your type.
 //!
 //! # Middleware and layers
 //!
 //! Like axum, kuri does not have its own bespoke middleware system, and instead utilises the tower
 //! ecosystem of middleware. This means you can use anything from [`tower`], [`axum`], or [`tonic`]
 //! (gRPC). Middleware can be used to implement functionality like authorisation and logging. More
-//! generally, anything that needs to happen before, after, or intercepts a request to a tool, prompt,
-//! or resource, can be implemented using tower layers with kuri.
+//! generally, anything that needs to happen before, after, or intercepts a request to a tool,
+//! prompt, or resource, can be implemented using tower layers with kuri.
 //!
 //! We provide [an example][middleware example] of integrating tracing using a layer. Tower also
 //! provides [a guide][tower guide to writing middleware] to get started writing middleware.
@@ -109,10 +111,9 @@
 //!     .service(service);
 //! ```
 //!
-//! In this case, the layers are applied in order of declaration, before finally routing the request
-//! to the MCP service. On return, the handlers are called in reverse order. So the first declared
-//! layer will be the first to process an incoming request, and the last to process an outgoing
-//! response.
+//! The layers are applied in the order they're declared, before finally routing the request to the
+//! MCP service. On return, the handlers are called in reverse order. So the first declared layer
+//! will be the first to process an incoming request, and the last to process an outgoing response.
 //!
 //! ## Per-[tool/prompt/resource] middleware
 //!
@@ -130,33 +131,30 @@
 //! This has a few implications for middleware. For tracing for instance, you may want this to apply
 //! at the request level. In that case, you can use `.into_request_service()` on the service before
 //! applying your tracing middleware. Other middleware may prefer to be applied at the message level,
-//! and can be applied on [`MCPServer`] instead.
+//! and can be applied on [`MCPService`] instead.
 //!
 //! # Sharing state with handlers
 //!
 //! Handlers can share state with each other, and persist state across invocations, through types
 //! saved within the MCPService's [`Context`]. As in the [counter example], when creating your
-//! service, provide state to the builder:
-//!
-//! ```rust,ignore
-//! let my_state = Counter::default();
-//! let service = MCPServiceBuilder::new(...)
-//!     .with_state(Inject::new(my_state))
-//!     .build();
-//! ```
-//!
-//! You can then access the state within your handlers using by wrapping your type in `Inject`:
+//! service, provide state to the builder. You can then access the state within your handlers using
+//! by wrapping your type in [`Inject`]:
 //!
 //! ```rust
-//! # use kuri::context::Inject;
-//! # use std::sync::atomic::{AtomicI32, Ordering};
-//! # use std::sync::Arc;
-//! # struct Counter {
-//! #     inner: Arc<AtomicI32>,
-//! # }
+//! use kuri::{MCPServiceBuilder, context::Inject};
+//! use serde::Deserialize;
+//! use std::sync::atomic::{AtomicI32, Ordering};
+//!
+//! #[derive(Default, Deserialize)]
+//! struct Counter(AtomicI32);
+//!
+//! let my_state = Counter::default();
+//! let service = MCPServiceBuilder::new("Hello World".to_string())
+//!     .with_state(Inject::new(my_state))
+//!     .build();
 //!
 //! async fn increment(counter: Inject<Counter>, quantity: u32) {
-//!     counter.inner.fetch_add(quantity as i32, Ordering::SeqCst);
+//!     counter.0.fetch_add(quantity as i32, Ordering::SeqCst);
 //! }
 //! ```
 //!
@@ -175,8 +173,10 @@
 //! we are unable to log messages to stdout, as discussed in [the MCP docs](https://modelcontextprotocol.io/docs/tools/debugging#server-side-logging)
 //!
 //! You can change the tokio_subscriber writer to any other output stream, for example file logging:
-//! ```rust,ignore
-//! let file_appender = tracing_appender::rolling::daily(tempfile::tempdir()?, "server.log");
+//! ```rust
+//! use tracing_subscriber::EnvFilter;
+//!
+//! let file_appender = tracing_appender::rolling::daily(tempfile::tempdir().unwrap(), "server.log");
 //! tracing_subscriber::fmt()
 //!     .with_env_filter(EnvFilter::from_default_env())
 //!     .with_writer(file_appender)
@@ -189,11 +189,23 @@
 //!
 //! [mcp-spec]: https://modelcontextprotocol.io/specification/2025-03-26/
 //! [examples]: https://github.com/itsaphel/kuri/tree/main/examples
-//! [tower]: https://github.com/tokio-rs/tower
+//! [`tower`]: https://github.com/tower-rs/tower
+//! [`axum`]: https://github.com/tokio-rs/axum
+//! [`tonic`]: https://github.com/hyperium/tonic
 //! [counter example]: https://github.com/itsaphel/kuri/tree/main/examples/02_stateful_counter_tool_server.rs
 //! [middleware example]: https://github.com/itsaphel/kuri/tree/main/examples/04_hyper_middleware.rs
-//! [`ServiceBuilder`]: https://TODO
-//! [tower guide to writing middleware]: https://TODO
+//! [`ServiceBuilder`]: tower::ServiceBuilder
+//! [tower guide to writing middleware]: https://github.com/tower-rs/tower/blob/master/guides/building-a-middleware-from-scratch.md
+//! [`IntoCallToolResult`]: crate::response::IntoCallToolResult
+//! [`Notification`]: kuri_mcp_protocol::jsonrpc::Notification
+//! [`SendableMessage`]: kuri_mcp_protocol::jsonrpc::SendableMessage
+//! [`Request`]: kuri_mcp_protocol::jsonrpc::Request
+//! [`MCPService`]: crate::MCPService
+//! [`MCPRequestService`]: crate::MCPRequestService
+//! [`MCPServer`]: crate::MCPService
+//! [`Context`]: crate::context::Context
+//! [`Inject`]: crate::context::Inject
+//! [`FromContext`]: crate::context::FromContext
 
 pub mod context;
 pub mod errors;

@@ -119,7 +119,7 @@ impl fmt::Display for DisplayableError {
     }
 }
 
-/// Allow converting anything Into<String> into a DisplayableError
+/// Allow converting anything `Into<String>` into a `DisplayableError`
 impl<E: Into<String>> From<E> for DisplayableError {
     fn from(err: E) -> Self {
         DisplayableError(err.into())
