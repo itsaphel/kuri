@@ -39,6 +39,7 @@ type NotificationHandler = Rc<dyn Fn(&Context, Notification) -> LocalBoxFuture<'
 #[derive(Clone)]
 pub struct MCPService {
     name: String,
+    version: String,
     instructions: Option<String>,
     tools: Rc<Tools>,
     prompts: Rc<Prompts>,
@@ -52,6 +53,7 @@ pub struct MCPService {
 /// modified after that time.
 pub struct MCPServiceBuilder {
     name: String,
+    version: String,
     instructions: Option<String>,
     tools: Tools,
     prompts: Prompts,
@@ -65,12 +67,18 @@ impl MCPServiceBuilder {
     pub fn new(name: String) -> Self {
         Self {
             name,
+            version: "0.1.0".to_string(),
             instructions: None,
             tools: HashMap::new(),
             prompts: HashMap::new(),
             ctx: Context::default(),
             notification_handler: None,
         }
+    }
+
+    pub fn with_version(mut self, version: String) -> Self {
+        self.version = version;
+        self
     }
 
     pub fn with_instructions(mut self, instructions: String) -> Self {
@@ -105,6 +113,7 @@ impl MCPServiceBuilder {
     pub fn build(self) -> MCPService {
         MCPService {
             name: self.name,
+            version: self.version,
             instructions: self.instructions,
             tools: Rc::new(self.tools),
             prompts: Rc::new(self.prompts),
@@ -175,6 +184,7 @@ impl CapabilitiesBuilder {
 
 trait MCPServiceTrait: 'static {
     fn name(&self) -> String;
+    fn version(&self) -> String;
     fn instructions(&self) -> Option<String>;
     fn capabilities(&self) -> ServerCapabilities;
 
@@ -197,6 +207,10 @@ trait MCPServiceTrait: 'static {
 impl MCPServiceTrait for MCPService {
     fn name(&self) -> String {
         self.name.clone()
+    }
+
+    fn version(&self) -> String {
+        self.version.clone()
     }
 
     fn instructions(&self) -> Option<String> {
@@ -341,7 +355,7 @@ impl MCPService {
                 capabilities: self.capabilities(),
                 server_info: Implementation {
                     name: self.name(),
-                    version: env!("CARGO_PKG_VERSION").to_string(),
+                    version: self.version(),
                 },
                 instructions: self.instructions(),
             };
