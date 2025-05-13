@@ -1,6 +1,6 @@
 [package]
 name = "kuri"
-version = "0.2.0"
+version = "0.2.1"
 description = """
 An SDK for building MCP servers, focused on elegant developer experience, where tools and prompts
 are just plain old Rust functions.
