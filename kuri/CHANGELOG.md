@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1](https://github.com/itsaphel/kuri/compare/kuri-v0.2.0...kuri-v0.2.1) - 2025-05-13
+
+### Other
+
+- fix docstring in `service_ext.rs`
+
 ## [0.2.0](https://github.com/itsaphel/kuri/compare/v0.1.0...kuri-v0.2.0) - 2025-05-12
 
 - Transport rewrite ([#1](https://github.com/itsaphel/kuri/pull/1))
