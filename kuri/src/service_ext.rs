@@ -7,7 +7,8 @@ use crate::MCPRequestService;
 
 /// Extension trait that adds additional methods to any [`Service`] that processes MCP messages.
 pub trait ServiceExt<R>: Service<R> + Sized {
-    /// Convert this service into a [`MCPRequestService`], which processes a single MCP request.
+    /// Convert this service into a [`MCPRequestService`], which can handle a MCP request (potentially
+    /// containing multiple MCP messages).
     fn into_request_service(self) -> MCPRequestService<Self>;
 }
 
